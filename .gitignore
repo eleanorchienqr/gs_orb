@@ -64,6 +64,16 @@ Thirdparty/DBoW2/lib/
 Thirdparty/g2o/build/
 Thirdparty/g2o/config.h
 Thirdparty/g2o/lib/
+
+Thirdparty/libtorch/
+Thirdparty/ceres-solver-1.14.0/
+Thirdparty/eigen-3.4.0/
+Thirdparty/librealsense-master/
+Thirdparty/opencv_contrib-4.4.0/
+Thirdparty/opencv-4.4.0/
+Thirdparty/Pangolin-0.8/
+Thirdparty/Sophus/
+
 Vocabulary/ORBvoc.txt
 build/
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(ORB_SLAM3)
+project(ORB_SLAM3 LANGUAGES CUDA CXX))
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -12,20 +12,20 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 
-# Check C++11 or C++0x support
+# Check c++14 or C++0x support
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
    add_definitions(-DCOMPILEDWITHC11)
-   message(STATUS "Using flag -std=c++11.")
+   message(STATUS "Using flag -std=c++14.")
 elseif(COMPILER_SUPPORTS_CXX0X)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
    add_definitions(-DCOMPILEDWITHC0X)
    message(STATUS "Using flag -std=c++0x.")
 else()
-   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no c++14 support. Please use a different C++ compiler.")
 endif()
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
@@ -42,6 +42,14 @@ find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(realsense2)
 
+# libtorch setup
+set(LIBTORCH_DIR "${PROJECT_SOURCE_DIR}/Thirdparty/libtorch")
+set(CMAKE_PREFIX_PATH ${LIBTORCH_DIR})
+set(Torch_DIR ${PROJECT_SOURCE_DIR}/Thirdparty/libtorch/share/cmake/Torch)  
+find_package(Torch REQUIRED)
+set(CMAKE_CXX_FLAGS "${CAMKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+set(CUDA_INCLUDE_DIRS "/usr/local/cuda/include")
+
 include_directories(
 ${PROJECT_SOURCE_DIR}
 ${PROJECT_SOURCE_DIR}/include
@@ -49,6 +57,7 @@ ${PROJECT_SOURCE_DIR}/include/CameraModels
 ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
 ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
+${CUDA_INCLUDE_DIRS}
 )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
@@ -62,6 +71,7 @@ src/ORBextractor.cc
 src/ORBmatcher.cc
 src/FrameDrawer.cc
 src/Converter.cc
+src/MapGaussian.cc
 src/MapPoint.cc
 src/KeyFrame.cc
 src/Atlas.cc
@@ -90,6 +100,7 @@ include/ORBextractor.h
 include/ORBmatcher.h
 include/FrameDrawer.h
 include/Converter.h
+include/MapGaussian.h
 include/MapPoint.h
 include/KeyFrame.h
 include/Atlas.h
@@ -119,6 +130,7 @@ target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
+${TORCH_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
 -lboost_serialization

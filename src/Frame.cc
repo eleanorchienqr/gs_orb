@@ -20,6 +20,7 @@
 
 #include "G2oTypes.h"
 #include "MapPoint.h"
+#include "MapGaussian.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
 #include "Converter.h"

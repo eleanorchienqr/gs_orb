@@ -20,8 +20,10 @@
 #ifndef MAP_H
 #define MAP_H
 
+#include "CameraModels/GeometricCamera.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
+#include "ORBVocabulary.h"
 
 #include <set>
 #include <pangolin/pangolin.h>
@@ -37,6 +39,7 @@ class MapPoint;
 class KeyFrame;
 class Atlas;
 class KeyFrameDatabase;
+class GeometricCamera;
 
 class Map
 {
@@ -131,17 +134,18 @@ public:
     unsigned int GetLowerKFID();
 
     void PreSave(std::set<GeometricCamera*> &spCams);
-    void PostLoad(KeyFrameDatabase* pKFDB, ORBVocabulary* pORBVoc/*, map<long unsigned int, KeyFrame*>& mpKeyFrameId*/, map<unsigned int, GeometricCamera*> &mpCams);
+    void PostLoad(KeyFrameDatabase* pKFDB, ORBVocabulary* pORBVoc/*, map<long unsigned int, KeyFrame*>& mpKeyFrameId*/, std::map<unsigned int, GeometricCamera*> &mpCams);
 
-    void printReprojectionError(list<KeyFrame*> &lpLocalWindowKFs, KeyFrame* mpCurrentKF, string &name, string &name_folder);
+    void printReprojectionError(std::list<KeyFrame*> &lpLocalWindowKFs, KeyFrame* mpCurrentKF, std::string &name, std::string &name_folder);
 
-    vector<KeyFrame*> mvpKeyFrameOrigins;
-    vector<unsigned long int> mvBackupKeyFrameOriginsId;
+    std::vector<KeyFrame*> mvpKeyFrameOrigins;
+    std::vector<unsigned long int> mvBackupKeyFrameOriginsId;
     KeyFrame* mpFirstRegionKF;
     std::mutex mMutexMapUpdate;
 
     // This avoid that two points are created simultaneously in separate threads (id conflict)
     std::mutex mMutexPointCreation;
+    std::mutex mMutexGaussianCreation;
 
     bool mbFail;
 

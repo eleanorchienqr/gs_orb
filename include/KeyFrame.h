@@ -21,6 +21,7 @@
 #define KEYFRAME_H
 
 #include "MapPoint.h"
+#include "MapGaussian.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
@@ -44,6 +45,7 @@ namespace ORB_SLAM3
 
 class Map;
 class MapPoint;
+class MapGaussian;
 class Frame;
 class KeyFrameDatabase;
 
@@ -447,6 +449,7 @@ protected:
 
     // MapPoints associated to keypoints
     std::vector<MapPoint*> mvpMapPoints;
+    std::vector<MapGaussian*> mvpMapGaussians;
     // For save relation without pointer, this is necessary for save/load function
     std::vector<long long int> mvBackupMapPointsId;
 

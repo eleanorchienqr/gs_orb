@@ -197,7 +197,7 @@ public:
     Eigen::Vector3f mNormalVectorMerge;
 
 
-    // Fopr inverse depth optimization
+    // For inverse depth optimization
     double mInvDepth;
     double mInitU;
     double mInitV;

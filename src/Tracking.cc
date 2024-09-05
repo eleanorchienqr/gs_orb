@@ -33,6 +33,7 @@
 
 #include <mutex>
 #include <chrono>
+#include<torch/torch.h>
 
 
 using namespace std;
@@ -2558,6 +2559,12 @@ void Tracking::CreateInitialMapMonocular()
 
         pMP->ComputeDistinctiveDescriptors();
         pMP->UpdateNormalAndDepth();
+
+        //Create corresponding MapGaussian
+        std::cout << "-------------Create corresponding MapGaussian------------" << std::endl;
+        torch::Tensor tensor = torch::ones(3);
+        std::cout << tensor << std::endl;
+
 
         //Fill Current Frame structure
         mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
