@@ -223,7 +223,8 @@ protected:
     bool mbFixScale;
 
 
-    bool mnFullBAIdx;
+    //bool mnFullBAIdx;
+    unsigned int mnFullBAIdx; // C++17
 
 
 

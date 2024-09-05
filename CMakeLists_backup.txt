@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 2.8)
-project(ORB_SLAM3)
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+project(ORB_SLAM3 LANGUAGES CUDA CXX)
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -7,22 +7,62 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
+# Define the absolute path to libtorch
+set(LIBTORCH_DIR "${PROJECT_SOURCE_DIR}/Thirdparty/libtorch")
+# Set CMAKE_PREFIX_PATH
+set(CMAKE_PREFIX_PATH ${LIBTORCH_DIR})
+set_target_properties(${PROJECT_NAME} PROPERTIES
+        CUDA_ARCHITECTURES native
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+)
+
+# Build options based on CMAKE_BUILD_TYPE
+function(configure_build_type)
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_options(${PROJECT_NAME} PRIVATE -O0 -g -G -Xcompiler -Werror)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+                CUDA_RESOLVE_DEVICE_SYMBOLS ON
+                CUDA_SEPARABLE_COMPILATION ON
+        )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+        target_compile_options(${PROJECT_NAME} PRIVATE -O3 -use_fast_math -Xcompiler -Ofast )
+    endif ()
+endfunction()
+configure_build_type()
+
+# Required packages
+find_package(CUDAToolkit REQUIRED)
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_EXTENSIONS OFF)
-add_definitions(-DCOMPILEDWITHC17)
-message(STATUS "Using flag -std=c++17.")
-
-LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
+# Check c++17 or C++0x support
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX17)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+   add_definitions(-DCOMPILEDWITHC17)
+   message(STATUS "Using flag -std=c++17.")
+elseif(COMPILER_SUPPORTS_CXX0X)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+   add_definitions(-DCOMPILEDWITHC0X)
+   message(STATUS "Using flag -std=c++0x.")
+else()
+   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no c++17 support. Please use a different C++ compiler.")
+endif()
 
 # libtorch setup
 set(Torch_DIR ${PROJECT_SOURCE_DIR}/Thirdparty/libtorch/share/cmake/Torch)  
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CAMKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+
+LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
 find_package(OpenCV 4.4)
    if(NOT OpenCV_FOUND)
