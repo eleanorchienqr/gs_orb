@@ -11,6 +11,8 @@
 
 #include "SerializationUtils.h"
 
+#define ChildNum 10
+
 namespace ORB_SLAM3 {
 
 class KeyFrame;
@@ -201,6 +203,49 @@ class MapGaussian
         std::mutex mMutexMap;
 
 };
+
+// struct MapGaussianNode{
+//     MapGaussian data;
+//     MapGaussianNode* children[ChildNum];
+
+//     MapGaussianNode(const MapGaussian& newData):data(newData){
+//         for(int i = 0; i<ChildNum; i++)
+//             children[i] = NULL;
+//     }
+
+//     ~MapGaussianNode(){
+//         for(int i = 0; i<ChildNum && children[i]; i++)
+//             delete children[i];
+//     }
+
+//     MapGaussianNode* AddChild(const MapGaussian& newData){
+//         MapGaussianNode*  newNode = new MapGaussianNode(newData);
+//         for(int i = 0; i<ChildNum; i++){
+//             if(children[i] == NULL){
+//                 children[i] = newNode;
+//                 break;
+//             }
+//         }
+//         return newNode;
+//     }
+// };
+
+// class MapGaussianTree
+// {
+//     private:
+//         MapGaussianNode* root;
+    
+//     public:
+//         MapGaussianTree():root(NULL){}
+//         MapGaussianTree(const MapGaussian& data):root(new MapGaussianNode(data)){}
+//         ~MapGaussianTree(){
+//             delete root;
+//         }
+        
+//         MapGaussianNode* GetRoot(){
+//             return root;
+//         }
+// };
 
 }//namespace ORB_SLAM
 
