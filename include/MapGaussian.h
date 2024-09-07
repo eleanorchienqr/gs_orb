@@ -42,8 +42,8 @@ class MapGaussian
         ar & mBackupObservationsId1;
         ar & mBackupObservationsId2;
         ar & mBackupRefKFId;
-        //ar & mnVisible;
-        //ar & mnFound;
+        ar & mnVisible;
+        ar & mnFound;
 
         ar & mbBad;
         ar & mBackupReplacedId;
@@ -108,7 +108,7 @@ class MapGaussian
         // int PredictScale(const float &currentDist, KeyFrame*pKF);
         // int PredictScale(const float &currentDist, Frame* pF);
 
-        // Map* GetMap();
+        Map* GetMap();
         // void UpdateMap(Map* pMap);
 
         // void PrintObservations();

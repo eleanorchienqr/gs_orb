@@ -28,6 +28,7 @@ MapGaussian::MapGaussian(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap
     mpReplaced(static_cast<MapGaussian*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap),
     mnOriginMapId(pMap->GetId())
 {
+    // std::cout << "-------------Create single MapGaussian------------" << std::endl;
     mWorldPos = Pos;
     // mWorldRot = Rot;
     // mScale = Scale;
@@ -69,6 +70,12 @@ void MapGaussian::SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vect
     mScale = Scale;
     mOpacity = Opacity;
     mFeatureDC = FeatureDC;
+}
+
+Map* MapGaussian::GetMap()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return mpMap;
 }
 
 

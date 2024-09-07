@@ -21,6 +21,7 @@
 #define MAP_H
 
 #include "CameraModels/GeometricCamera.h"
+#include "MapGaussian.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include "ORBVocabulary.h"
@@ -36,6 +37,7 @@ namespace ORB_SLAM3
 {
 
 class MapPoint;
+class MapGaussianTree;
 class KeyFrame;
 class Atlas;
 class KeyFrameDatabase;
@@ -84,11 +86,14 @@ public:
     void InformNewBigChange();
     int GetLastBigChangeIdx();
 
+    void AddMapGaussianTree(MapGaussianTree* pMGT);
+
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
     std::vector<MapPoint*> GetReferenceMapPoints();
 
     long unsigned int MapPointsInMap();
+    long unsigned int MapGaussianTreesInMap();
     long unsigned  KeyFramesInMap();
 
     long unsigned int GetId();
@@ -164,6 +169,7 @@ protected:
     long unsigned int mnId;
 
     std::set<MapPoint*> mspMapPoints;
+    std::set<MapGaussianTree*> mspMapGaussianForest;
     std::set<KeyFrame*> mspKeyFrames;
 
     // Save/load, the set structure is broken in libboost 1.58 for ubuntu 16.04, a vector is serializated

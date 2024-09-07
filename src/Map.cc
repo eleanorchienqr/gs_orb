@@ -45,6 +45,7 @@ Map::~Map()
 {
     //TODO: erase all points from memory
     mspMapPoints.clear();
+    mspMapGaussianForest.clear();
 
     //TODO: erase all keyframes from memory
     mspKeyFrames.clear();
@@ -81,6 +82,12 @@ void Map::AddMapPoint(MapPoint *pMP)
 {
     unique_lock<mutex> lock(mMutexMap);
     mspMapPoints.insert(pMP);
+}
+
+void Map::AddMapGaussianTree(MapGaussianTree *pMGT)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    mspMapGaussianForest.insert(pMGT);
 }
 
 void Map::SetImuInitialized()
@@ -162,6 +169,12 @@ long unsigned int Map::MapPointsInMap()
     return mspMapPoints.size();
 }
 
+long unsigned int Map::MapGaussianTreesInMap()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return mspMapGaussianForest.size();
+}
+
 long unsigned int Map::KeyFramesInMap()
 {
     unique_lock<mutex> lock(mMutexMap);
@@ -224,6 +237,7 @@ void Map::clear()
     }
 
     mspMapPoints.clear();
+    mspMapGaussianForest.clear();
     mspKeyFrames.clear();
     mnMaxKFid = mnInitKFid;
     mbImuInitialized = false;

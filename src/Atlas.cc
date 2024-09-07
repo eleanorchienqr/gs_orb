@@ -112,6 +112,11 @@ void Atlas::AddMapPoint(MapPoint* pMP)
     pMapMP->AddMapPoint(pMP);
 }
 
+void Atlas::AddMapGaussianTree(MapGaussianTree* pMGT){
+    Map* pMapMP = pMGT->GetRoot()->data->GetMap();
+    pMapMP->AddMapGaussianTree(pMGT);
+}
+
 GeometricCamera* Atlas::AddCamera(GeometricCamera* pCam)
 {
     //Check if the camera already exists
@@ -180,6 +185,12 @@ long unsigned int Atlas::MapPointsInMap()
 {
     unique_lock<mutex> lock(mMutexAtlas);
     return mpCurrentMap->MapPointsInMap();
+}
+
+long unsigned int Atlas::MapGaussianTreesInMap()
+{
+    unique_lock<mutex> lock(mMutexAtlas);
+    return mpCurrentMap->MapGaussianTreesInMap();
 }
 
 long unsigned Atlas::KeyFramesInMap()

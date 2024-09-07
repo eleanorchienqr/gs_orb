@@ -2561,22 +2561,24 @@ void Tracking::CreateInitialMapMonocular()
         pMP->UpdateNormalAndDepth();
 
         //Create corresponding MapGaussian
-        std::cout << "-------------Create corresponding MapGaussian------------" << std::endl;
+        // std::cout << "-------------Create corresponding MapGaussian in CreateInitialMapMonocular------------" << std::endl;
         // torch::Tensor tensor = torch::ones(3);
         // std::cout << tensor << std::endl;
-        // MapGaussian* pMG = new MapGaussian(worldPos,pKFcur,mpAtlas->GetCurrentMap());
-        // MapGaussianTree* pMGT =  new MapGaussianTree(pMG);
+        MapGaussian* pMG = new MapGaussian(worldPos,pKFcur,mpAtlas->GetCurrentMap());
+        MapGaussianTree* pMGT =  new MapGaussianTree(pMG);
 
-        // pKFini->AddMapGaussianTree(pMGT,i);
-        // pKFcur->AddMapGaussianTree(pMGT,mvIniMatches[i]);
+        pKFini->AddMapGaussianTree(pMGT,i);
+        pKFcur->AddMapGaussianTree(pMGT,mvIniMatches[i]);
 
 
         //Fill Current Frame structure
         mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
+        mCurrentFrame.mvpMapGaussianForest[mvIniMatches[i]] = pMGT;
         mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
 
         //Add to Map
         mpAtlas->AddMapPoint(pMP);
+        mpAtlas->AddMapGaussianTree(pMGT);
     }
 
 
@@ -2589,6 +2591,7 @@ void Tracking::CreateInitialMapMonocular()
 
     // Bundle Adjustment
     Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
+    Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapGaussianTreesInMap()) + " gaussian trees", Verbose::VERBOSITY_QUIET);
     Optimizer::GlobalBundleAdjustemnt(mpAtlas->GetCurrentMap(),20);
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
