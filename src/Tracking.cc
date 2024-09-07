@@ -2562,8 +2562,13 @@ void Tracking::CreateInitialMapMonocular()
 
         //Create corresponding MapGaussian
         std::cout << "-------------Create corresponding MapGaussian------------" << std::endl;
-        torch::Tensor tensor = torch::ones(3);
-        std::cout << tensor << std::endl;
+        // torch::Tensor tensor = torch::ones(3);
+        // std::cout << tensor << std::endl;
+        // MapGaussian* pMG = new MapGaussian(worldPos,pKFcur,mpAtlas->GetCurrentMap());
+        // MapGaussianTree* pMGT =  new MapGaussianTree(pMG);
+
+        // pKFini->AddMapGaussianTree(pMGT,i);
+        // pKFcur->AddMapGaussianTree(pMGT,mvIniMatches[i]);
 
 
         //Fill Current Frame structure

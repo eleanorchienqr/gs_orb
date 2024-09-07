@@ -28,6 +28,7 @@ MapGaussian::MapGaussian(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap
     mpReplaced(static_cast<MapGaussian*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap),
     mnOriginMapId(pMap->GetId())
 {
+    mWorldPos = Pos;
     // mWorldRot = Rot;
     // mScale = Scale;
     // mOpacity = Opacity;

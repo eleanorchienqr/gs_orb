@@ -23,6 +23,7 @@
 #include<vector>
 
 
+#include "MapGaussian.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 
@@ -46,7 +47,7 @@ namespace ORB_SLAM3
 #define FRAME_GRID_COLS 64
 
 class MapPoint;
-class MapGaussian;
+class MapGaussianTree;
 class KeyFrame;
 class ConstraintPoseImu;
 class GeometricCamera;
@@ -233,7 +234,7 @@ public:
 
     // Corresponding stereo coordinate and depth for each keypoint.
     std::vector<MapPoint*> mvpMapPoints;
-    std::vector<MapGaussian*> mvpMapGaussians;
+    std::vector<MapGaussianTree*> mvpMapGaussianForest;
     // "Monocular" keypoints have a negative value.
     std::vector<float> mvuRight;
     std::vector<float> mvDepth;

@@ -45,7 +45,7 @@ namespace ORB_SLAM3
 
 class Map;
 class MapPoint;
-class MapGaussian;
+class MapGaussianTree;
 class Frame;
 class KeyFrameDatabase;
 
@@ -251,6 +251,7 @@ public:
     // MapPoint observation functions
     int GetNumberMPs();
     void AddMapPoint(MapPoint* pMP, const size_t &idx);
+    void AddMapGaussianTree(MapGaussianTree *pMGT, const size_t &idx);
     void EraseMapPointMatch(const int &idx);
     void EraseMapPointMatch(MapPoint* pMP);
     void ReplaceMapPointMatch(const int &idx, MapPoint* pMP);
@@ -449,7 +450,7 @@ protected:
 
     // MapPoints associated to keypoints
     std::vector<MapPoint*> mvpMapPoints;
-    std::vector<MapGaussian*> mvpMapGaussians;
+    std::vector<MapGaussianTree*> mvpMapGaussianForest;
     // For save relation without pointer, this is necessary for save/load function
     std::vector<long long int> mvBackupMapPointsId;
 

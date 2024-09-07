@@ -204,48 +204,43 @@ class MapGaussian
 
 };
 
-// struct MapGaussianNode{
-//     MapGaussian data;
-//     MapGaussianNode* children[ChildNum];
+struct MapGaussianNode{
 
-//     MapGaussianNode(const MapGaussian& newData):data(newData){
-//         for(int i = 0; i<ChildNum; i++)
-//             children[i] = NULL;
-//     }
+    MapGaussian* data;
+    std::vector<MapGaussianNode*> children;
 
-//     ~MapGaussianNode(){
-//         for(int i = 0; i<ChildNum && children[i]; i++)
-//             delete children[i];
-//     }
+    MapGaussianNode(MapGaussian* newData):data(newData){
+        children = std::vector<MapGaussianNode*>(ChildNum,static_cast<MapGaussianNode*>(NULL)); 
+    }
 
-//     MapGaussianNode* AddChild(const MapGaussian& newData){
-//         MapGaussianNode*  newNode = new MapGaussianNode(newData);
-//         for(int i = 0; i<ChildNum; i++){
-//             if(children[i] == NULL){
-//                 children[i] = newNode;
-//                 break;
-//             }
-//         }
-//         return newNode;
-//     }
-// };
+    MapGaussianNode* AddChild(MapGaussian* newData){
+        MapGaussianNode*  newNode = new MapGaussianNode(newData);
+        for(int i = 0; i<ChildNum; i++){
+            if(children[i] == NULL){
+                children[i] = newNode;
+                break;
+            }
+        }
+        return newNode;
+    }
+};
 
-// class MapGaussianTree
-// {
-//     private:
-//         MapGaussianNode* root;
+class MapGaussianTree
+{
+    private:
+        MapGaussianNode* root;
     
-//     public:
-//         MapGaussianTree():root(NULL){}
-//         MapGaussianTree(const MapGaussian& data):root(new MapGaussianNode(data)){}
-//         ~MapGaussianTree(){
-//             delete root;
-//         }
+    public:
+        MapGaussianTree():root(NULL){}
+        MapGaussianTree(MapGaussian* data):root(new MapGaussianNode(data)){}
+        ~MapGaussianTree(){
+            delete root;
+        }
         
-//         MapGaussianNode* GetRoot(){
-//             return root;
-//         }
-// };
+        MapGaussianNode* GetRoot(){
+            return root;
+        }
+};
 
 }//namespace ORB_SLAM
 
