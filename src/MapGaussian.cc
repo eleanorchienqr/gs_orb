@@ -72,6 +72,12 @@ void MapGaussian::SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vect
     mFeatureDC = FeatureDC;
 }
 
+Eigen::Vector3f MapGaussian::GetWorldPos()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    return mWorldPos;
+}
+
 Map* MapGaussian::GetMap()
 {
     unique_lock<mutex> lock(mMutexMap);

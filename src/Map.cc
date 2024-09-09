@@ -20,6 +20,7 @@
 #include "Map.h"
 
 #include<mutex>
+#include <vector>
 
 namespace ORB_SLAM3
 {
@@ -151,16 +152,32 @@ int Map::GetLastBigChangeIdx()
     return mnBigChangeIdx;
 }
 
-vector<KeyFrame*> Map::GetAllKeyFrames()
+std::vector<KeyFrame*> Map::GetAllKeyFrames()
 {
     unique_lock<mutex> lock(mMutexMap);
     return vector<KeyFrame*>(mspKeyFrames.begin(),mspKeyFrames.end());
 }
 
-vector<MapPoint*> Map::GetAllMapPoints()
+std::vector<MapPoint*> Map::GetAllMapPoints()
 {
     unique_lock<mutex> lock(mMutexMap);
     return vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
+}
+
+std::vector<MapGaussian*> Map::GetAllMapGaussians()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    // std::vector<MapGaussianTree*> MapGaussianForest(mspMapGaussianForest.begin(), mspMapGaussianForest?.end());
+    std::vector<MapGaussian*> AllMapGaussians;
+    // for(MapGaussianTree* itMGT = mspMapGaussianForest.begin(); itMGT!=mspMapGaussianForest.end(); itMGT++)
+    for(set<MapGaussianTree*>::iterator itMGT=mspMapGaussianForest.begin(); itMGT!=mspMapGaussianForest.end(); itMGT++)
+    {
+        MapGaussianTree* GaussianTree = *itMGT;
+        MapGaussian* pMG = GaussianTree->GetRoot()->data;
+        AllMapGaussians.push_back(pMG);
+
+    }
+    return AllMapGaussians;
 }
 
 long unsigned int Map::MapPointsInMap()

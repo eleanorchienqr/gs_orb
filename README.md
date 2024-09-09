@@ -9,3 +9,7 @@ evo_ape tum f_dataset-MH03_mono.txt ./Groundtruth/MH03_GT.tum --align --plot -va
 wget https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.4.0%2Bcu121.zip
 unzip libtorch-cxx11-abi-shared-with-deps-2.4.0+cu121.zip -d Thirdparty/
 ```
+
+# MonoGS GUI
+
+Folder `gui`

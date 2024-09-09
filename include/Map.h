@@ -37,6 +37,7 @@ namespace ORB_SLAM3
 {
 
 class MapPoint;
+class MapGaussian;
 class MapGaussianTree;
 class KeyFrame;
 class Atlas;
@@ -91,6 +92,8 @@ public:
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
     std::vector<MapPoint*> GetReferenceMapPoints();
+
+    std::vector<MapGaussian*> GetAllMapGaussians();
 
     long unsigned int MapPointsInMap();
     long unsigned int MapGaussianTreesInMap();

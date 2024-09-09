@@ -175,6 +175,30 @@ void MapDrawer::DrawMapPoints()
     glEnd();
 }
 
+void MapDrawer::DrawMapGaussians()
+{
+    Map* pActiveMap = mpAtlas->GetCurrentMap();
+    if(!pActiveMap)
+        return;
+
+    const vector<MapGaussian*> &vpMGTs = pActiveMap->GetAllMapGaussians();
+
+    if(vpMGTs.empty())
+        return;
+
+    // glPointSize(mPointSize);
+    glPointSize(20.0);
+    glBegin(GL_POINTS);
+    glColor3f(1.0,1.0,0.0);
+
+    for(size_t i=0, iend=vpMGTs.size(); i<iend;i++)
+    {
+        Eigen::Matrix<float,3,1> pos = vpMGTs[i]->GetWorldPos();
+        glVertex3f(pos(0),pos(1),pos(2));
+    }
+    glEnd();
+}
+
 void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph, const bool bDrawInertialGraph, const bool bDrawOptLba)
 {
     const float &w = mKeyFrameSize;

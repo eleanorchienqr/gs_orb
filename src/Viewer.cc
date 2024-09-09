@@ -174,11 +174,13 @@ void Viewer::Run()
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     pangolin::CreatePanel("menu").SetBounds(0.0,1.0,0.0,pangolin::Attach::Pix(175));
+    //pangolin::Var (NAME, DEFAULT STATE, SELECT FRAME)
     pangolin::Var<bool> menuFollowCamera("menu.Follow Camera",false,true);
     pangolin::Var<bool> menuCamView("menu.Camera View",false,false);
     pangolin::Var<bool> menuTopView("menu.Top View",false,false);
     // pangolin::Var<bool> menuSideView("menu.Side View",false,false);
     pangolin::Var<bool> menuShowPoints("menu.Show Points",true,true);
+    pangolin::Var<bool> menuShowGaussians("menu.Show Gaussians",true,true);
     pangolin::Var<bool> menuShowKeyFrames("menu.Show KeyFrames",true,true);
     pangolin::Var<bool> menuShowGraph("menu.Show Graph",false,true);
     pangolin::Var<bool> menuShowInertialGraph("menu.Show Inertial Graph",true,true);
@@ -314,9 +316,12 @@ void Viewer::Run()
             mpMapDrawer->DrawKeyFrames(menuShowKeyFrames,menuShowGraph, menuShowInertialGraph, menuShowOptLba);
         if(menuShowPoints)
             mpMapDrawer->DrawMapPoints();
+        if(menuShowGaussians)
+            mpMapDrawer->DrawMapGaussians();
 
         pangolin::FinishFrame();
 
+        // Show current frame
         cv::Mat toShow;
         cv::Mat im = mpFrameDrawer->DrawFrame(trackedImageScale);
 
@@ -338,12 +343,20 @@ void Viewer::Run()
         cv::imshow("ORB-SLAM3: Current Frame",toShow);
         cv::waitKey(mT);
 
+        //TODO Show rendered frame
+        cv::Mat toShowRenderView;
+        cv::Mat imRender = mpFrameDrawer->DrawRenderedFrame(trackedImageScale);
+        toShowRenderView = imRender;
+        cv::imshow("ORB-SLAM3: Current Rendered Frame",toShowRenderView);
+        cv::waitKey(mT);
+
         if(menuReset)
         {
             menuShowGraph = true;
             menuShowInertialGraph = true;
             menuShowKeyFrames = true;
             menuShowPoints = true;
+            menuShowGaussians = true;
             menuLocalizationMode = false;
             if(bLocalizationMode)
                 mpSystem->DeactivateLocalizationMode();

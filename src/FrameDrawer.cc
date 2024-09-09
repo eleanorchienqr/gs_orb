@@ -201,6 +201,11 @@ cv::Mat FrameDrawer::DrawFrame(float imageScale)
     return imWithInfo;
 }
 
+cv::Mat FrameDrawer::DrawRenderedFrame(float imageScale)
+{
+    return mIm;
+}
+
 cv::Mat FrameDrawer::DrawRightFrame(float imageScale)
 {
     cv::Mat im;

@@ -10,6 +10,7 @@
 #include "Map.h"
 
 #include "SerializationUtils.h"
+#include <vector>
 
 #define ChildNum 10
 
@@ -66,7 +67,7 @@ class MapGaussian
         void SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
                               const float &Opacity,const Eigen::Vector3f &FeatureDC);
         // void SetWorldPos(const Eigen::Vector3f &Pos);
-        // Eigen::Vector3f GetWorldPos();
+        Eigen::Vector3f GetWorldPos();
 
         // void SetCov(const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale);
         // Eigen::Matrix3d GetCov();
@@ -199,6 +200,7 @@ class MapGaussian
 
         // Mutex
         std::mutex mMutexParam;
+        std::mutex mMutexPos;
         std::mutex mMutexFeatures;
         std::mutex mMutexMap;
 
@@ -240,6 +242,7 @@ class MapGaussianTree
         MapGaussianNode* GetRoot(){
             return root;
         }
+        std::vector<MapGaussian*> GetAllGaussians();
 };
 
 }//namespace ORB_SLAM
