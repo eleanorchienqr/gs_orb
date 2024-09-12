@@ -167,15 +167,13 @@ std::vector<MapPoint*> Map::GetAllMapPoints()
 std::vector<MapGaussian*> Map::GetAllMapGaussians()
 {
     unique_lock<mutex> lock(mMutexMap);
-    // std::vector<MapGaussianTree*> MapGaussianForest(mspMapGaussianForest.begin(), mspMapGaussianForest?.end());
     std::vector<MapGaussian*> AllMapGaussians;
-    // for(MapGaussianTree* itMGT = mspMapGaussianForest.begin(); itMGT!=mspMapGaussianForest.end(); itMGT++)
+
     for(set<MapGaussianTree*>::iterator itMGT=mspMapGaussianForest.begin(); itMGT!=mspMapGaussianForest.end(); itMGT++)
     {
         MapGaussianTree* GaussianTree = *itMGT;
         MapGaussian* pMG = GaussianTree->GetRoot()->data;
         AllMapGaussians.push_back(pMG);
-
     }
     return AllMapGaussians;
 }

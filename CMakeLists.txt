@@ -41,7 +41,10 @@ include_directories(
 ${PROJECT_SOURCE_DIR}
 ${PROJECT_SOURCE_DIR}/include
 ${PROJECT_SOURCE_DIR}/include/CameraModels
+${PROJECT_SOURCE_DIR}/include/Renderer
+${PROJECT_SOURCE_DIR}/include/Renderer/cuda_rasterizer
 ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
+${PROJECT_SOURCE_DIR}/Thirdparty/glm
 ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
 )
@@ -72,6 +75,14 @@ src/ImuTypes.cc
 src/G2oTypes.cc
 src/CameraModels/Pinhole.cpp
 src/CameraModels/KannalaBrandt8.cpp
+src/Renderer/IndexBuffer.cpp
+src/Renderer/Renderer.cpp
+src/Renderer/Shader.cpp
+src/Renderer/VertexArray.cpp
+src/Renderer/VertexBuffer.cpp
+src/Renderer/cuda_rasterizer/backward.cu
+src/Renderer/cuda_rasterizer/forward.cu
+src/Renderer/cuda_rasterizer/rasterizer_impl.cu
 src/OptimizableTypes.cpp
 src/MLPnPsolver.cpp
 src/GeometricTools.cc
@@ -102,6 +113,19 @@ include/G2oTypes.h
 include/CameraModels/GeometricCamera.h
 include/CameraModels/Pinhole.h
 include/CameraModels/KannalaBrandt8.h
+include/Renderer/IndexBuffer.h
+include/Renderer/Renderer.h
+include/Renderer/Shader.h
+include/Renderer/VertexArray.h
+include/Renderer/VertexBuffer.h
+include/Renderer/VertextBufferLayout.h
+include/Renderer/cuda_rasterizer/auxiliary.h
+include/Renderer/cuda_rasterizer/backward.h
+include/Renderer/cuda_rasterizer/config.h
+include/Renderer/cuda_rasterizer/forward.h
+include/Renderer/cuda_rasterizer/rasterizer_impl.h
+include/Renderer/cuda_rasterizer/rasterizer.h
+include/Renderer/cuda_rasterizer/serialization.h
 include/OptimizableTypes.h
 include/MLPnPsolver.h
 include/GeometricTools.h
@@ -110,13 +134,16 @@ include/SerializationUtils.h
 include/Config.h
 include/Settings.h)
 
-add_subdirectory(Thirdparty/g2o)
+add_subdirectory(
+        Thirdparty/g2o
+)
 
 target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
 ${TORCH_LIBRARIES}
+glfw
 CUDA::cudart
 CUDA::cublas
 CUDA::cufft

@@ -12,4 +12,6 @@ unzip libtorch-cxx11-abi-shared-with-deps-2.4.0+cu121.zip -d Thirdparty/
 
 # MonoGS GUI
 
-Folder `gui`
+Folder `Shaders` includes a vertex shader `gau_vert.glsl` and a fragment shader `gau_frag.glsl`.
+
+`OpenGL 4.6.0` with `GLFW 3.4`
