@@ -45,6 +45,7 @@ ${PROJECT_SOURCE_DIR}/include/Renderer
 ${PROJECT_SOURCE_DIR}/include/Renderer/cuda_rasterizer
 ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
 ${PROJECT_SOURCE_DIR}/Thirdparty/glm
+${PROJECT_SOURCE_DIR}/Thirdparty/imgui
 ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
 )
