@@ -81,6 +81,8 @@ src/Renderer/Renderer.cpp
 src/Renderer/Shader.cpp
 src/Renderer/VertexArray.cpp
 src/Renderer/VertexBuffer.cpp
+src/Renderer/GaussianRenderer.cpp
+src/Renderer/RenderGUI.cpp
 src/Renderer/cuda_rasterizer/backward.cu
 src/Renderer/cuda_rasterizer/forward.cu
 src/Renderer/cuda_rasterizer/rasterizer_impl.cu
@@ -120,6 +122,8 @@ include/Renderer/Shader.h
 include/Renderer/VertexArray.h
 include/Renderer/VertexBuffer.h
 include/Renderer/VertextBufferLayout.h
+include/Renderer/GaussianRenderer.h
+include/Renderer/RenderGUI.h
 include/Renderer/cuda_rasterizer/auxiliary.h
 include/Renderer/cuda_rasterizer/backward.h
 include/Renderer/cuda_rasterizer/config.h
