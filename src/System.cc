@@ -208,6 +208,11 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     else
         mpLocalMapper->mbFarPoints = false;
 
+    //Initialize the Gaussian Renderer thread and launch
+    mpGaussianMapper = new GaussianMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
+                                        mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
+    mptGaussianMapping = new thread(&ORB_SLAM3::GaussianMapping::Run,mpGaussianMapper);
+
     //Initialize the Loop Closing thread and launch
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
     mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);

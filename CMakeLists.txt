@@ -50,12 +50,23 @@ ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
 )
 
+# Gaussian RenderGUI
+set(GUI_SOURCES ${GUI_SOURCES} 
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui.cpp
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/backends/imgui_impl_glfw.cpp
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/backends/imgui_impl_opengl3.cpp
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_draw.cpp
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_tables.cpp
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_widgets.cpp)
+
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 add_library(${PROJECT_NAME} SHARED
+${GUI_SOURCES} 
 src/System.cc
 src/Tracking.cc
 src/LocalMapping.cc
+src/GaussianMapping.cc
 src/LoopClosing.cc
 src/ORBextractor.cc
 src/ORBmatcher.cc
@@ -95,6 +106,7 @@ src/Settings.cc
 include/System.h
 include/Tracking.h
 include/LocalMapping.h
+include/GaussianMapping.h
 include/LoopClosing.h
 include/ORBextractor.h
 include/ORBmatcher.h
@@ -175,11 +187,18 @@ endif()
 # Build examples
 
 # Render examples
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/GaussianRenderer)
+if(CUDA_FOUND)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/GaussianRenderer)
+  cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Examples/GaussianRenderer)
 
-add_executable(renderer
-        Examples/GaussianRenderer/renderer_test.cc)
-target_link_libraries(renderer ${PROJECT_NAME})
+  cuda_add_executable(
+    renderer
+    Examples/GaussianRenderer/renderer_test.cc 
+    Examples/GaussianRenderer/kernel.cu
+  )
+
+  target_link_libraries(renderer ${PROJECT_NAME})
+endif()
 
 # RGB-D examples
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/RGB-D)

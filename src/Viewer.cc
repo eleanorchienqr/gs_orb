@@ -18,6 +18,7 @@
 
 
 #include "Viewer.h"
+#include "RenderGUI.h"
 #include <pangolin/pangolin.h>
 
 #include <mutex>
@@ -181,6 +182,7 @@ void Viewer::Run()
     // pangolin::Var<bool> menuSideView("menu.Side View",false,false);
     pangolin::Var<bool> menuShowPoints("menu.Show Points",true,true);
     pangolin::Var<bool> menuShowGaussians("menu.Show Gaussians",true,true);
+    // pangolin::Var<bool> menuShowRenderedImages("menu.Show Rendered Images",true,true);
     pangolin::Var<bool> menuShowKeyFrames("menu.Show KeyFrames",true,true);
     pangolin::Var<bool> menuShowGraph("menu.Show Graph",false,true);
     pangolin::Var<bool> menuShowInertialGraph("menu.Show Inertial Graph",true,true);
@@ -206,6 +208,8 @@ void Viewer::Run()
     Twc.SetIdentity();
     pangolin::OpenGlMatrix Ow; // Oriented with g in the z axis
     Ow.SetIdentity();
+ 
+    // CV window
     cv::namedWindow("ORB-SLAM3: Current Frame");
 
     bool bFollow = true;
@@ -341,13 +345,6 @@ void Viewer::Run()
         }
 
         cv::imshow("ORB-SLAM3: Current Frame",toShow);
-        cv::waitKey(mT);
-
-        //TODO Show rendered frame
-        cv::Mat toShowRenderView;
-        cv::Mat imRender = mpFrameDrawer->DrawRenderedFrame(trackedImageScale);
-        toShowRenderView = imRender;
-        cv::imshow("ORB-SLAM3: Current Rendered Frame",toShowRenderView);
         cv::waitKey(mT);
 
         if(menuReset)

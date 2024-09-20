@@ -48,7 +48,6 @@ public:
 
     // Draw last processed frame.
     cv::Mat DrawFrame(float imageScale=1.f);
-    cv::Mat DrawRenderedFrame(float imageScale=1.f);
     cv::Mat DrawRightFrame(float imageScale=1.f);
 
     bool both;

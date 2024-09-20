@@ -33,6 +33,7 @@
 #include "MapDrawer.h"
 #include "Atlas.h"
 #include "LocalMapping.h"
+#include "GaussianMapping.h"
 #include "LoopClosing.h"
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
@@ -77,6 +78,7 @@ class MapDrawer;
 class Atlas;
 class Tracking;
 class LocalMapping;
+class GaussianMapping;
 class LoopClosing;
 class Settings;
 
@@ -220,6 +222,9 @@ private:
     // Local Mapper. It manages the local map and performs local bundle adjustment.
     LocalMapping* mpLocalMapper;
 
+    // Gaussian Mapper. It manages the Gaussian map.
+    GaussianMapping* mpGaussianMapper;
+
     // Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
     // a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
     LoopClosing* mpLoopCloser;
@@ -233,6 +238,7 @@ private:
     // System threads: Local Mapping, Loop Closing, Viewer.
     // The Tracking thread "lives" in the main execution thread that creates the System object.
     std::thread* mptLocalMapping;
+    std::thread* mptGaussianMapping;
     std::thread* mptLoopClosing;
     std::thread* mptViewer;
 
