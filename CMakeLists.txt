@@ -57,7 +57,9 @@ set(GUI_SOURCES ${GUI_SOURCES}
         ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/backends/imgui_impl_opengl3.cpp
         ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_draw.cpp
         ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_tables.cpp
-        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_widgets.cpp)
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_widgets.cpp
+        ${PROJECT_SOURCE_DIR}/Thirdparty/imgui/imgui_demo.cpp
+        )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
@@ -194,7 +196,6 @@ if(CUDA_FOUND)
   cuda_add_executable(
     renderer
     Examples/GaussianRenderer/renderer_test.cc 
-    Examples/GaussianRenderer/kernel.cu
   )
 
   target_link_libraries(renderer ${PROJECT_NAME})

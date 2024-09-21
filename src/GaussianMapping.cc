@@ -45,6 +45,8 @@ GaussianMapping::GaussianMapping(System* pSys, Atlas *pAtlas, const float bMonoc
     mNumLM = 0;
     mNumKFCulling=0;
 
+    mpGUI = new RenderGUI();
+
 #ifdef REGISTER_TIMES
     nLBA_exec = 0;
     nLBA_abort = 0;
@@ -64,8 +66,9 @@ void GaussianMapping::SetTracker(Tracking *pTracker)
 
 void GaussianMapping::Run()
 {
-   ORB_SLAM3::RenderGUI testGUI;
-   testGUI.InitializeWidget();
+//    Map* pCurrentMap = mpAtlas->GetCurrentMap();
+   mpGUI->InitializeWindow();
+   mpGUI->Frame();
 }
 
 void GaussianMapping::InsertKeyFrame(KeyFrame *pKF)

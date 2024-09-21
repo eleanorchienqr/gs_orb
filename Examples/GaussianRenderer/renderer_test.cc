@@ -1,100 +1,63 @@
 #include <iostream>
-// #include <GL/glew.h>
-// #include <GLFW/glfw3.h>
-// #include "RenderGUI.h"
-
-// /*
-// 1. Set shaders
-// */
-
-
-// int main(void)
-// { 
-//     ORB_SLAM3::RenderGUI testGUI;
-//     testGUI.InitializeWidget();
-// }
-
-#include <iostream>
-
 #include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
-#include <pangolin/pangolin.h>
-#include <pangolin/gl/glcuda.h>
-#include <pangolin/gl/glvbo.h>
+#include "Renderer.h"
 
-#include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
-#include <vector_types.h>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
-using namespace pangolin;
-using namespace std;
+#include <Thirdparty/imgui/imgui.h>
+#include <Thirdparty/imgui/backends/imgui_impl_glfw.h>
+#include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
 
-// Mesh size
-const int mesh_width=256;
-const int mesh_height=256;
 
-extern "C" void launch_kernel(float4* dVertexArray, uchar4* dColourArray, unsigned int width, unsigned int height, float time);
-
-int main( int /*argc*/, char* argv[] )
+int main(void)
 {
-//  cudaGLSetGLDevice(0);
+    GLFWwindow* window;
 
-  pangolin::CreateWindowAndBind("Main",640,480);
-  glewInit();
-  
-  // 3D Mouse handler requires depth testing to be enabled  
-  glEnable(GL_DEPTH_TEST);  
+    /* Initialize the library */
+    if (!glfwInit()) return -1;
 
-  // Create vertex and colour buffer objects and register them with CUDA
-  GlBufferCudaPtr vertex_array(
-      GlArrayBuffer, mesh_width*mesh_height, GL_FLOAT, 4,
-      cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW
-  );
-  GlBufferCudaPtr colour_array(
-      GlArrayBuffer, mesh_width*mesh_height, GL_UNSIGNED_BYTE, 4,
-      cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW
-  );
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  // Define Camera Render Object (for view / scene browsing)
-  pangolin::OpenGlRenderState s_cam(
-    ProjectionMatrix(640,480,420,420,320,240,0.1,1000),
-    ModelViewLookAt(-0,2,-2, 0,0,0, AxisY)
-  );
-  const int UI_WIDTH = 180;
-
-  // Add named OpenGL viewport to window and provide 3D Handler
-  View& d_cam = pangolin::Display("cam")
-    .SetBounds(0.0, 1.0, Attach::Pix(UI_WIDTH), 1.0, -640.0f/480.0f)
-    .SetHandler(new Handler3D(s_cam));
-
-  // Add named Panel and bind to variables beginning 'ui'
-  // A Panel is just a View with a default layout and input handling
-  View& d_panel = pangolin::CreatePanel("ui")
-      .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
-
-  // Default hooks for exiting (Esc) and fullscreen (tab).
-  for(int frame=0; !pangolin::ShouldQuit(); ++frame)
-  {
-    static double time = 0;
-    static Var<double> delta("ui.time delta", 0.001, 0, 0.005);
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    d_cam.Activate(s_cam);
-    glColor3f(1.0,1.0,1.0);
-
-    {
-      CudaScopedMappedPtr var(vertex_array);
-      CudaScopedMappedPtr car(colour_array);
-      launch_kernel((float4*)*var,(uchar4*)*car,mesh_width,mesh_height,time);
-      time += delta;
+    /* Create a windowed mode window and its OpenGL context */
+    window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
+    if (!window) {
+        glfwTerminate();
+        return -1;
     }
 
-    pangolin::RenderVboCbo(vertex_array, colour_array);
+    /* Make the window's context current */
+    glfwMakeContextCurrent(window);
+    /**
+     * 交换间隔，交换缓冲区之前等待的帧数，通常称为v-sync
+     * 默认情况下，交换间隔为0
+     * 这里设置为1，即每帧更新一次
+     **/
+    glfwSwapInterval(1);
 
-    // Swap frames and Process Events
-    pangolin::FinishFrame();
-  }
+    GLenum err = glewInit();
+    if (GLEW_OK != err) {
+        std::cout << "Error: " << glewGetErrorString(err) << std::endl;
+    }
+    std::cout << "Status: Using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
+    
+    unsigned char* glVersion;
+    GLCall(glVersion = (unsigned char*)glGetString(GL_VERSION));
+    std::cout << "Status: Using GL " << glVersion << std::endl;
 
-  return 0;
+    GLCall(glEnable(GL_BLEND));
+    GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+    Renderer renderer;
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+    glfwDestroyWindow(window);
+
+    glfwTerminate();
+    return 0;
 }

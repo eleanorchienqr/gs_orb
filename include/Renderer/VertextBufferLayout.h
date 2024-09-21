@@ -1,3 +1,6 @@
+#ifndef VERTEXBUFFERLAYOUT_H
+#define VERTEXBUFFERLAYOUT_H
+
 #pragma once
 
 #include <vector>
@@ -52,6 +55,8 @@ public:
         m_Stride += count * VertexBufferElement::GetSizeofType(GL_UNSIGNED_BYTE);
     }
 };
+
+#endif
 
 
 

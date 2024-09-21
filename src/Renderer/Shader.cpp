@@ -2,7 +2,6 @@
 #include <fstream>
 #include <sstream>
 
-#include "Shader.h"
 #include "Renderer.h"
 
 Shader::Shader(const std::string& filepath)
@@ -47,14 +46,14 @@ ShaderProgramSource Shader::ParseShader(const std::string& filepath)
     ShaderType type = ShaderType::NONE;
 
     type = ShaderType::VERTEX;
-    std::ifstream vertex_stream(filepath + "/gau_vert.glsl");
+    std::ifstream vertex_stream(filepath + "/basic_vert.glsl");
     while ( getline(vertex_stream, line) )
     {
         ss[int(type)] << line << "\n";
     }
 
     type = ShaderType::FRAGMENT;
-    std::ifstream frag_stream(filepath + "/gau_frag.glsl");
+    std::ifstream frag_stream(filepath + "/basic_frag.glsl");
     while ( getline(frag_stream, line) )
     {
         ss[int(type)] << line << "\n";

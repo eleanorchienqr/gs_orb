@@ -1,3 +1,6 @@
+#ifndef VERTEXARRAY_H
+#define VERTEXARRAY_H
+
 #include "VertexBuffer.h"
 #include "VertextBufferLayout.h"
 
@@ -14,3 +17,5 @@ public:
     void Unbind() const;
 
 };
+
+#endif

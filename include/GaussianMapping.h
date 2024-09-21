@@ -26,6 +26,7 @@
 #include "Tracking.h"
 #include "KeyFrameDatabase.h"
 #include "Settings.h"
+#include "RenderGUI.h"
 
 #include <mutex>
 
@@ -37,6 +38,7 @@ class System;
 class Tracking;
 class LoopClosing;
 class Atlas;
+class RenderGUI;
 
 class GaussianMapping
 {
@@ -160,6 +162,9 @@ protected:
 
     LoopClosing* mpLoopCloser;
     Tracking* mpTracker;
+
+    // RenderGUI
+    RenderGUI* mpGUI;
 
     std::list<KeyFrame*> mlNewKeyFrames;
 

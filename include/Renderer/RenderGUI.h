@@ -7,7 +7,6 @@
 #include <Thirdparty/imgui/imgui.h>
 #include <Thirdparty/imgui/backends/imgui_impl_glfw.h>
 #include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
-// #include <Thirdparty/imguizmo/ImGuizmo.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -24,13 +23,26 @@ private:
     // bool mGUInitialization; 
     // GaussianRenderer mGaussianRenderer;
     // self.g_camera
+    const int mWindowSizeWidth = 1200;
+    const int mWindowSizeHeight = 800;
+
+    GLFWwindow* mGLFWindow = nullptr;
+    bool mGUIRedraw = true;
+    bool mRenderWindow = false; // open in InitializeWindow; control render or not
 
 public:
     RenderGUI();
     ~RenderGUI();
 
-    bool InitializeWidget();
+    void redraw_gui_next_frame() {
+		mGUIRedraw = true;
+	}
 
+    void InitializeWindow();
+    void DestroyWindow();
+    void ImGUIWindow();
+    bool BeginFrameAndHandleUserInput();
+    bool Frame();
 };
 
 } //namespace ORB_SLAM3
