@@ -38,7 +38,7 @@ public:
     inline const std::vector<VertexBufferElement> GetElements() const{return m_Elements;}
 
     template< typename T >
-    void Push(unsigned int count, unsigned char normalized){ Push_(count, normalized, (T*)0); }
+    void Push(unsigned int count, unsigned char normalized = GL_FALSE){ Push_(count, normalized, (T*)0); }
 
     void Push_(unsigned int count, unsigned char normalized, float*){
         m_Elements.push_back({GL_FLOAT, count, GL_FALSE});

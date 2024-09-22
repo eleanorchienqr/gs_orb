@@ -33,8 +33,6 @@ void Shader::SetUnifrom4f(const std::string& name, float v0, float v1, float v2,
 
 ShaderProgramSource Shader::ParseShader(const std::string& filepath)
 {
-    
-
     enum class ShaderType
     {
         NONE = -1, VERTEX = 0, FRAGMENT = 1
@@ -58,6 +56,9 @@ ShaderProgramSource Shader::ParseShader(const std::string& filepath)
     {
         ss[int(type)] << line << "\n";
     }
+
+    std::cout << "Vertex Shader: "  << ss[0].str() << std::endl;
+    std::cout << "Frag Shader: "  << ss[1].str() << std::endl;
 
     return { ss[0].str(), ss[1].str() };
 }
@@ -85,7 +86,6 @@ unsigned int Shader::CompileShader(unsigned int type, const std::string& source)
     }
 
     return id;
-
 }
 
 unsigned int Shader::CreateShader(const std::string& vertexShader, const std::string& fragmentShader)

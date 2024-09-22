@@ -34,6 +34,12 @@ MESSAGE(${OpenCV_VERSION})
 
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
+
+# For Render
+find_package(glfw3 REQUIRED)
+set(glfw3_LIBS /usr/lib/x86_64-linux-gnu/libglfw.so.3.3)
+
+
 # find_package(realsense2)
 
 
@@ -135,7 +141,7 @@ include/Renderer/Renderer.h
 include/Renderer/Shader.h
 include/Renderer/VertexArray.h
 include/Renderer/VertexBuffer.h
-include/Renderer/VertextBufferLayout.h
+include/Renderer/VertexBufferLayout.h
 include/Renderer/GaussianRenderer.h
 include/Renderer/RenderGUI.h
 include/Renderer/cuda_rasterizer/auxiliary.h
@@ -162,7 +168,7 @@ ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
 ${TORCH_LIBRARIES}
-glfw
+${glfw3_LIBS}
 CUDA::cudart
 CUDA::cublas
 CUDA::cufft
