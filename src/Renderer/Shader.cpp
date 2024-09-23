@@ -31,6 +31,11 @@ void Shader::SetUnifrom4f(const std::string& name, float v0, float v1, float v2,
     GLCall(glUniform4f(GetUniformLocation(name), v0, v1, v2, v3));
 }
 
+void Shader::SetUnifromMat4f(const std::string& name, const glm::mat4& matrix)
+{
+    GLCall(glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, &matrix[0][0]));
+}
+
 ShaderProgramSource Shader::ParseShader(const std::string& filepath)
 {
     enum class ShaderType
@@ -65,7 +70,7 @@ ShaderProgramSource Shader::ParseShader(const std::string& filepath)
 
 unsigned int Shader::CompileShader(unsigned int type, const std::string& source)
 {
-    unsigned int id = glCreateShader(GL_VERTEX_SHADER);
+    unsigned int id = glCreateShader(type);
     const char* src = source.c_str();
     glShaderSource(id, 1, &src, nullptr);
     glCompileShader(id);

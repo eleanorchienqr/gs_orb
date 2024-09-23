@@ -37,7 +37,7 @@ find_package(Pangolin REQUIRED)
 
 # For Render
 find_package(glfw3 REQUIRED)
-set(glfw3_LIBS /usr/lib/x86_64-linux-gnu/libglfw.so.3.3)
+set(glfw3_LIBS /usr/lib/x86_64-linux-gnu/libglfw.so)
 
 
 # find_package(realsense2)

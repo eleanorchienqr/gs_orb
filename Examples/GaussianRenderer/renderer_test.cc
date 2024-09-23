@@ -9,80 +9,12 @@
 #include "VertexBufferLayout.h"
 #include "Shader.h"
 
-// #include "glm/glm.hpp"
-// #include "glm/gtc/matrix_transform.hpp"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
-// #include <Thirdparty/imgui/imgui.h>
-// #include <Thirdparty/imgui/backends/imgui_impl_glfw.h>
-// #include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
-
-// int main(void)
-// {
-//     GLFWwindow* window;
-
-//     /* Initialize the library */
-//     if (!glfwInit()) return -1;
-
-//     // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-//     // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-//     // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-//     /* Create a windowed mode window and its OpenGL context */
-//     window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
-//     if (!window) {
-//         glfwTerminate();
-//         return -1;
-//     }
-
-//     /* Make the window's context current */
-//     glfwMakeContextCurrent(window);
-//     glfwSwapInterval(1);
-
-//     GLenum err = glewInit();
-//     if (GLEW_OK != err) {
-//         std::cout << "Error: " << glewGetErrorString(err) << std::endl;
-//     }
-//     std::cout << "Status: Using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
-    
-//     unsigned char* glVersion;
-//     GLCall(glVersion = (unsigned char*)glGetString(GL_VERSION));
-//     std::cout << "Status: Using GL " << glVersion << std::endl;
-
-//     GLCall(glEnable(GL_BLEND));
-//     GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-
-//     float positions[] = {
-//         -0.5f, -0.5f, //0
-//         0.0f, 0.5f,  //1
-//         0.5f, -0.5f,   //2
-//     };
-
-//     unsigned int buffer;
-//     glGenBuffers(1, &buffer);
-//     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-//     glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW);
-
-//     glEnableVertexAttribArray(0);
-//     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0);
-
-
-//     /* Loop until the user closes the window */
-//     while (!glfwWindowShouldClose(window))
-//     {
-//         /* Render here */
-//         glClear(GL_COLOR_BUFFER_BIT);
-
-//         glDrawArrays(GL_TRIANGLES, 0, 3);
-//         /* Swap front and back buffers */
-//         glfwSwapBuffers(window);
-
-//         /* Poll for and process events */
-//         glfwPollEvents();
-//     }
-
-//     glfwTerminate();
-//     return 0;
-// }
+#include <Thirdparty/imgui/imgui.h>
+#include <Thirdparty/imgui/backends/imgui_impl_glfw.h>
+#include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
 
 int main(void)
 {
@@ -111,7 +43,12 @@ int main(void)
         std::cout << "Error: " << glewGetErrorString(err) << std::endl;
     }
     std::cout << "Status: Using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
-
+    std::cout << "Status: Using GLFW " << glfwGetVersionString() << std::endl;
+    
+    unsigned char* glVersion;
+    GLCall(glVersion = (unsigned char*)glGetString(GL_VERSION));
+    std::cout << "Status: Using GL " << glVersion << std::endl;
+    
     GLCall(glEnable(GL_BLEND));
     GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
@@ -136,15 +73,29 @@ int main(void)
 
     IndexBuffer ib(indices, 6);
 
+    glm::mat4 proj = glm::ortho(-2.0f, 2.0f, -1.2f, 1.2f, -1.0f, 1.0f);         // projection matrix
+    glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 0, 0));   // view matrix; camera right, object left
+
     Shader shader("/home/ray/Desktop/ORB_SLAM3/src/Renderer/assets");
     shader.Bind();
-    // shader.SetUnifrom4f("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
+    shader.SetUnifrom4f("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
+    
     
     va.Unbind();
     vb.Unbind();
     ib.Unbind();
     shader.Unbind();
     Renderer renderer;
+
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigInputTrickleEventQueue = false; // new ImGui event handling seems to make camera controls laggy if this is true.
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 460 core");
+    ImGui::StyleColorsDark();
+
+    glm::vec3 translation(0.4f, 0.4f, 0);
 
     float r = 0.0f;
     float increment = 0.05f;
@@ -153,9 +104,16 @@ int main(void)
     {
         renderer.Clear();
 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), translation);// model matrix
+        glm::mat4 mvp = proj * view * model;
+
         shader.Bind();
-        // shader.SetUnifrom4f("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
-        // shader.SetUnifrom4f("u_Color", r, 0.3f, 0.8f, 1.0f);
+        shader.SetUnifrom4f("u_Color", r, 0.3f, 0.8f, 1.0f);
+        shader.SetUnifromMat4f("u_MVP", mvp);
 
         renderer.Draw(va, ib, shader);
 
@@ -166,9 +124,21 @@ int main(void)
 
         r += increment; 
 
+        {
+            ImGui::SliderFloat3("Translation", &translation.x, 0.0f, 2.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
+        }
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
     return 0;
 }
