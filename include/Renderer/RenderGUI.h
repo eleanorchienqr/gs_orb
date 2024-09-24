@@ -1,6 +1,7 @@
 #ifndef RENDERGUI_H
 #define RENDERGUI_H
 
+#include <functional>
 #include <iostream>
 
 
@@ -9,6 +10,9 @@
 #include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "GaussianRenderer.h"
 
@@ -43,6 +47,54 @@ public:
     void ImGUIWindow();
     bool BeginFrameAndHandleUserInput();
     bool Frame();
+};
+
+class Test{
+
+public:
+    Test(){}
+    virtual ~Test() {}
+
+    virtual void OnUpdate(float deltaTime) {}
+    virtual void OnRender() {}
+    virtual void OnImGuiRender() {}
+
+
+};
+
+class TestClearColor : public Test
+{
+public:
+    TestClearColor();
+    ~TestClearColor();
+
+    void OnUpdate(float deltaTime) override;
+    void OnRender() override;
+    void OnImGuiRender() override;
+
+private:
+    float mClearColor[4];
+
+};
+
+class TestMenu : public Test
+{
+public:
+    TestMenu(Test*& CurrentTestPointer);
+
+    void OnImGuiRender() override;
+
+    template<typename T>
+    void RegisterTest(const std::string& name)
+    {
+        std::cout << "Registering test" << name << std::endl;
+        mTests.push_back(std::make_pair(name, []() { return new T(); }));
+    }
+
+private:
+    Test*& mCurrentTest;
+    std::vector<std::pair<std::string, std::function<Test*()>>> mTests;
+
 };
 
 } //namespace ORB_SLAM3

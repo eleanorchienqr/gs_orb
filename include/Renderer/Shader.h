@@ -1,7 +1,9 @@
 #ifndef SHADER_H
 #define SHADER_H
 
+#include <GL/gl.h>
 #include <string>
+#include <unordered_map>
 
 #include "glm/glm.hpp"
 
@@ -17,6 +19,7 @@ private:
     std::string m_FilePath;
     unsigned int m_RendererID;
     //caching for uniforms
+    mutable std::unordered_map<std::string, GLint> m_UniformLocationCache;
 
 public:
     Shader(const std::string& filepath);
@@ -33,6 +36,6 @@ private:
     ShaderProgramSource ParseShader(const std::string& filepath);
     unsigned int CompileShader(unsigned int type, const std::string& source);
     unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader);
-    int GetUniformLocation(const std::string& name);
+    GLint GetUniformLocation(const std::string& name) const;
 };
 #endif
