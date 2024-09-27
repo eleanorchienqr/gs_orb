@@ -11,6 +11,7 @@
 
 #include "SerializationUtils.h"
 #include <vector>
+#include <torch/torch.h>
 
 #define ChildNum 10
 
@@ -56,6 +57,7 @@ class MapGaussian
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         MapGaussian();
+        MapGaussian(const long unsigned int SHDegree);
         // Initialization from associated MapPoints
         MapGaussian(const Eigen::Vector3f &Pos, KeyFrame* pRefKF, Map* pMap); 
         MapGaussian(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
@@ -67,6 +69,8 @@ class MapGaussian
         void SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
                               const float &Opacity,const Eigen::Vector3f &FeatureDC);
         // void SetWorldPos(const Eigen::Vector3f &Pos);
+        
+        // Getters
         Eigen::Vector3f GetWorldPos();
 
         // void SetCov(const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale);
@@ -172,7 +176,7 @@ class MapGaussian
         float mOpacity;
         long unsigned int mSHDegree = 10;
         Eigen::Vector3f mFeatureDC;
-        // Eigen::Matrix3Xf mFeaturest;
+        Eigen::MatrixXf mFeaturest;
 
         // For save relation without pointer, this is necessary for save/load function
         std::map<long unsigned int, int> mBackupObservationsId1;
@@ -203,6 +207,15 @@ class MapGaussian
         std::mutex mMutexPos;
         std::mutex mMutexFeatures;
         std::mutex mMutexMap;
+    
+    private:
+        torch::Tensor _xyz;
+        torch::Tensor _features_dc;
+        torch::Tensor _features_rest;
+        torch::Tensor _scaling;
+        torch::Tensor _rotation;
+        torch::Tensor _xyz_gradient_accum;
+        torch::Tensor _opacity;
 
 };
 
@@ -242,7 +255,7 @@ class MapGaussianTree
         MapGaussianNode* GetRoot(){
             return root;
         }
-        std::vector<MapGaussian*> GetAllGaussians();
+        std::vector<MapGaussian*> GetAllMapGaussians();
 };
 
 }//namespace ORB_SLAM

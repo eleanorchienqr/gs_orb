@@ -91,6 +91,23 @@ void Map::AddMapGaussianTree(MapGaussianTree *pMGT)
     mspMapGaussianForest.insert(pMGT);
 }
 
+void Map::InitializeGaussianScale()
+{
+    std::vector<MapGaussian*> vpAllMapGaussians = GetAllMapGaussians();
+    // int vpMapGaussianSize = vpAllMapGaussians.size();
+    // Eigen::Matrix<float, vpAllMapGaussians.size(), 3> vpAllGaussianScale;
+    // for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
+    // {
+    //     if(vpAllMapGaussians[iMG])
+    //     {
+    //         MapGaussian* pMG = vpAllMapGaussians[iMG];
+    //         std::cout << "Position of MapGaussians in Map.cc: " << pMG->GetWorldPos() << std::endl;
+    //         vpAllGaussianScale.row(iMG) = pMG->GetWorldPos();
+    //     }
+    // }
+    // unique_lock<mutex> lock(mMutexMap);
+}
+
 void Map::SetImuInitialized()
 {
     unique_lock<mutex> lock(mMutexMap);

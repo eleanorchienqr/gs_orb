@@ -2581,6 +2581,9 @@ void Tracking::CreateInitialMapMonocular()
         mpAtlas->AddMapGaussianTree(pMGT);
     }
 
+    // Gaussian Scale Setting
+    // std::vector<MapGaussian*> vpAllMapGaussans = mpAtlas->GetAllMapGaussians();
+    mpAtlas->InitializeGaussianScale();
 
     // Update Connections
     pKFini->UpdateConnections();

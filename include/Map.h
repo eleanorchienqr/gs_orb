@@ -87,12 +87,13 @@ public:
     void InformNewBigChange();
     int GetLastBigChangeIdx();
 
+    // Methods for Gaussain operations
     void AddMapGaussianTree(MapGaussianTree* pMGT);
+    void InitializeGaussianScale();
 
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
     std::vector<MapPoint*> GetReferenceMapPoints();
-
     std::vector<MapGaussian*> GetAllMapGaussians();
 
     long unsigned int MapPointsInMap();

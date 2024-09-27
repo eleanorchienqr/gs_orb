@@ -38,6 +38,7 @@ namespace ORB_SLAM3
 class Viewer;
 class Map;
 class MapPoint;
+class MapGaussian;
 class MapGaussianTree;
 class KeyFrame;
 class KeyFrameDatabase;
@@ -92,6 +93,9 @@ public:
     //void EraseMapPoint(MapPoint* pMP);
     //void EraseKeyFrame(KeyFrame* pKF);
 
+    // Method for adjust Gaussian in map
+    void InitializeGaussianScale();
+
     GeometricCamera* AddCamera(GeometricCamera* pCam);
     std::vector<GeometricCamera*> GetAllCameras();
 
@@ -107,6 +111,7 @@ public:
     // Method for get data in current map
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
+    std::vector<MapGaussian*> GetAllMapGaussians();
     std::vector<MapPoint*> GetReferenceMapPoints();
 
     vector<Map*> GetAllMaps();
