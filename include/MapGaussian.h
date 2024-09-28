@@ -66,13 +66,15 @@ class MapGaussian
         // MapPoint(const double invDepth, cv::Point2f uv_init, KeyFrame* pRefKF, KeyFrame* pHostKF, Map* pMap);
         // MapPoint(const Eigen::Vector3f &Pos,  Map* pMap, Frame* pFrame, const int &idxF);
 
+        
+        //Setters
         void SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
                               const float &Opacity,const Eigen::Vector3f &FeatureDC);
+        void SetScale(const Eigen::Vector3f Scale) { mScale = Scale; }
         // void SetWorldPos(const Eigen::Vector3f &Pos);
         
         // Getters
         Eigen::Vector3f GetWorldPos();
-
         // void SetCov(const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale);
         // Eigen::Matrix3d GetCov();
 

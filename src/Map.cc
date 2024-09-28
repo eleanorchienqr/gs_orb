@@ -19,6 +19,9 @@
 
 #include "Map.h"
 
+#include <Thirdparty/simple-knn/spatial.h>
+#include <torch/torch.h>
+
 #include<mutex>
 #include <vector>
 
@@ -94,18 +97,36 @@ void Map::AddMapGaussianTree(MapGaussianTree *pMGT)
 void Map::InitializeGaussianScale()
 {
     std::vector<MapGaussian*> vpAllMapGaussians = GetAllMapGaussians();
-    // int vpMapGaussianSize = vpAllMapGaussians.size();
-    // Eigen::Matrix<float, vpAllMapGaussians.size(), 3> vpAllGaussianScale;
-    // for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
-    // {
-    //     if(vpAllMapGaussians[iMG])
-    //     {
-    //         MapGaussian* pMG = vpAllMapGaussians[iMG];
-    //         std::cout << "Position of MapGaussians in Map.cc: " << pMG->GetWorldPos() << std::endl;
-    //         vpAllGaussianScale.row(iMG) = pMG->GetWorldPos();
-    //     }
-    // }
-    // unique_lock<mutex> lock(mMutexMap);
+    int vpMapGaussianSize = vpAllMapGaussians.size();
+    Eigen::MatrixXf vpAllGaussianPos(3, vpMapGaussianSize);
+    for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
+    {
+        if(vpAllMapGaussians[iMG])
+        {
+            MapGaussian* pMG = vpAllMapGaussians[iMG];
+            vpAllGaussianPos.col(iMG) = pMG->GetWorldPos();
+        }
+    }
+    unique_lock<mutex> lock(mMutexMap);
+    const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
+    const torch::Tensor vpAllGaussianPosTensor = torch::from_blob(vpAllGaussianPos.transpose().data(), {vpMapGaussianSize, 3}, pointType).to(torch::kCUDA);
+    auto dist2 = torch::clamp_min(distCUDA2(vpAllGaussianPosTensor), 0.0000001);
+    auto _scaling = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3}).cpu();
+
+    Eigen::MatrixXf AllGaussianScaleTmp(_scaling.size(1), _scaling.size(0));
+    std::copy(_scaling.data_ptr<float>(), _scaling.data_ptr<float>() + _scaling.numel(), AllGaussianScaleTmp.data());
+    Eigen::MatrixXf AllGaussianScale = AllGaussianScaleTmp.transpose();
+    // std::cout << "Scale of Gaussians in Map.cc: " << AllGaussianScale << std::endl;
+    
+    for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
+    {
+        if(vpAllMapGaussians[iMG])
+        {
+            MapGaussian* pMG = vpAllMapGaussians[iMG];
+            pMG->SetScale(AllGaussianScale.row(iMG));
+            std::cout << "Scale of Gaussians in Map.cc: " << AllGaussianScale.row(iMG) << std::endl;
+        }
+    }
 }
 
 void Map::SetImuInitialized()

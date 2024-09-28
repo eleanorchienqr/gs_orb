@@ -24,6 +24,22 @@ set(Torch_DIR ${PROJECT_SOURCE_DIR}/Thirdparty/libtorch/share/cmake/Torch)
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CAMKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
+#find_package(Python COMPONENTS Interpreter Development)
+#message("Python_FOUND:${Python_FOUND}")
+#message("Python_VERSION:${Python_VERSION}")
+#message("Python_Development_FOUND:${Python_Development_FOUND}")
+set(PYTHON_INCLUDE_DIRS "/home/ray/.conda/envs/MonoGS/include/python3.7m")
+set(PYTHON_LIBRARIES "/home/ray/.conda/envs/MonoGS/lib/libpython3.7m.so")
+message("PYTHON_LIBRARIES:${PYTHON_LIBRARIES}")
+message("PYTHON_INCLUDE_DIRS:" ${PYTHON_INCLUDE_DIRS})
+
+#simple-knn
+set(SIMPLE_KNN_SOURCES
+    ${PROJECT_SOURCE_DIR}/Thirdparty/simple-knn/simple_knn.cu
+    ${PROJECT_SOURCE_DIR}/Thirdparty/simple-knn/spatial.cu
+)
+
+# OpenCV
 find_package(OpenCV 4.4)
    if(NOT OpenCV_FOUND)
       message(FATAL_ERROR "OpenCV > 4.4 not found.")
@@ -39,9 +55,7 @@ find_package(Pangolin REQUIRED)
 find_package(glfw3 REQUIRED)
 set(glfw3_LIBS /usr/lib/x86_64-linux-gnu/libglfw.so)
 
-
 # find_package(realsense2)
-
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -52,8 +66,10 @@ ${PROJECT_SOURCE_DIR}/include/Renderer/cuda_rasterizer
 ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
 ${PROJECT_SOURCE_DIR}/Thirdparty/glm
 ${PROJECT_SOURCE_DIR}/Thirdparty/imgui
+${PROJECT_SOURCE_DIR}/Thirdparty/simple-knn
 ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
+${PYTHON_INCLUDE_DIRS}
 )
 
 # Gaussian RenderGUI
@@ -71,6 +87,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 add_library(${PROJECT_NAME} SHARED
 ${GUI_SOURCES} 
+${SIMPLE_KNN_SOURCES}
 src/System.cc
 src/Tracking.cc
 src/LocalMapping.cc
@@ -167,6 +184,7 @@ target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
+${PYTHON_LIBRARIES}
 ${TORCH_LIBRARIES}
 ${glfw3_LIBS}
 CUDA::cudart

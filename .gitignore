@@ -75,6 +75,7 @@ Thirdparty/Pangolin-0.8/
 Thirdparty/glfw-3.4/
 Thirdparty/glm/
 Thirdparty/imgui/
+Thirdparty/simple-knn/
 
 Vocabulary/ORBvoc.txt
 build/

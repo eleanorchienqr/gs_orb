@@ -15,3 +15,11 @@ unzip libtorch-cxx11-abi-shared-with-deps-2.4.0+cu121.zip -d Thirdparty/
 Folder `Shaders` includes a vertex shader `gau_vert.glsl` and a fragment shader `gau_frag.glsl`.
 
 `OpenGL 4.6.0` with `GLFW 3.4` and `imgui` for visualization under a new thread `GaussianMapping`, referred by `instant-ngp` and `Orbeez-SLAM`.
+
+# LibTorch
+
+# Several Tips
+
+Opencv 4.4 needs tiff 4.0;
+
+Python version should be checked. Version 3.7 is tested fine.
