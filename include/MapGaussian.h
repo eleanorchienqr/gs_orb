@@ -33,14 +33,14 @@ class MapGaussian
         ar & nObs;
 
         // Protected variables
-        ar & boost::serialization::make_array(mWorldPos.data(), mWorldPos.size());
-        ar & boost::serialization::make_array(mWorldRot.data(), mWorldRot.size());
-        ar & boost::serialization::make_array(mScale.data(), mScale.size());
-        ar & boost::serialization::make_array(mFeatureDC.data(), mFeatureDC.size());
+        // ar & boost::serialization::make_array(mWorldPos.data(), mWorldPos.size());
+        // ar & boost::serialization::make_array(mWorldRot.data(), mWorldRot.size());
+        // ar & boost::serialization::make_array(mScale.data(), mScale.size());
+        // ar & boost::serialization::make_array(mFeatureDC.data(), mFeatureDC.size());
         
         //ar & BOOST_SERIALIZATION_NVP(mBackupObservationsId);
         //ar & mObservations;
-        ar & mOpacity;
+        // ar & mOpacity;
         ar & mBackupObservationsId1;
         ar & mBackupObservationsId2;
         ar & mBackupRefKFId;
@@ -57,24 +57,29 @@ class MapGaussian
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         MapGaussian();
-        MapGaussian(const long unsigned int SHDegree);
+        // MapGaussian(const long unsigned int SHDegree);
         // Initialization from associated MapPoints
         MapGaussian(const Eigen::Vector3f &Pos, KeyFrame* pRefKF, Map* pMap); 
-        MapGaussian(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
-                    const float &Opacity,const Eigen::Vector3f &FeatureDC, KeyFrame* pRefKF, Map* pMap);
+        // MapGaussian(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
+        //             const float &Opacity,const Eigen::Vector3f &FeatureDC, KeyFrame* pRefKF, Map* pMap);
 
         // MapPoint(const double invDepth, cv::Point2f uv_init, KeyFrame* pRefKF, KeyFrame* pHostKF, Map* pMap);
         // MapPoint(const Eigen::Vector3f &Pos,  Map* pMap, Frame* pFrame, const int &idxF);
 
+        //utils
+        inline torch::Tensor inverse_sigmoid(torch::Tensor x) {
+            return torch::log(x / (1 - x));
+        }
+
         
         //Setters
-        void SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
-                              const float &Opacity,const Eigen::Vector3f &FeatureDC);
-        void SetScale(const Eigen::Vector3f Scale) { mScale = Scale; }
+        // void SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
+        //                       const float &Opacity,const Eigen::Vector3f &FeatureDC);
+        void SetScale(const torch::Tensor &Scale);
         // void SetWorldPos(const Eigen::Vector3f &Pos);
         
         // Getters
-        Eigen::Vector3f GetWorldPos();
+        torch::Tensor GetWorldPos();
         // void SetCov(const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale);
         // Eigen::Matrix3d GetCov();
 
@@ -172,13 +177,21 @@ class MapGaussian
     
     protected:
         // Gaussian representation
-        Eigen::Vector3f mWorldPos;
-        Eigen::Vector4f mWorldRot;
-        Eigen::Vector3f mScale;
-        float mOpacity;
+        // Eigen::Vector3f mWorldPos;
+        // Eigen::Vector4f mWorldRot;
+        // Eigen::Vector3f mScale;
+        // float mOpacity;
+        // long unsigned int mSHDegree = 10;
+        // Eigen::Vector3f mFeatureDC;
+        // Eigen::MatrixXf mFeaturest;
         long unsigned int mSHDegree = 10;
-        Eigen::Vector3f mFeatureDC;
-        Eigen::MatrixXf mFeaturest;
+
+        torch::Tensor mWorldPos;            // {1, 3}
+        torch::Tensor mWorldRot;            // {1, 4}
+        torch::Tensor mScale;               // {1, 3}
+        torch::Tensor mOpacity;             // {1, 1}
+        torch::Tensor mFeatureDC;           // {1, 3}
+        torch::Tensor mFeaturest;           // {1, (mSHDegree+1)**2 - 1}
 
         // For save relation without pointer, this is necessary for save/load function
         std::map<long unsigned int, int> mBackupObservationsId1;
@@ -207,17 +220,9 @@ class MapGaussian
         // Mutex
         std::mutex mMutexParam;
         std::mutex mMutexPos;
+        std::mutex mMutexScale;
         std::mutex mMutexFeatures;
         std::mutex mMutexMap;
-    
-    private:
-        torch::Tensor _xyz;
-        torch::Tensor _features_dc;
-        torch::Tensor _features_rest;
-        torch::Tensor _scaling;
-        torch::Tensor _rotation;
-        torch::Tensor _xyz_gradient_accum;
-        torch::Tensor _opacity;
 
 };
 
@@ -257,7 +262,7 @@ class MapGaussianTree
         MapGaussianNode* GetRoot(){
             return root;
         }
-        std::vector<MapGaussian*> GetAllMapGaussians();
+        // std::vector<MapGaussian*> GetAllMapGaussians();
 };
 
 }//namespace ORB_SLAM

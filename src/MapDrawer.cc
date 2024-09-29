@@ -22,6 +22,8 @@
 #include <pangolin/pangolin.h>
 #include <mutex>
 
+#include <torch/torch.h>
+
 namespace ORB_SLAM3
 {
 
@@ -193,8 +195,12 @@ void MapDrawer::DrawMapGaussians()
 
     for(size_t i=0, iend=vpMGTs.size(); i<iend;i++)
     {
-        Eigen::Matrix<float,3,1> pos = vpMGTs[i]->GetWorldPos();
-        glVertex3f(pos(0),pos(1),pos(2));
+        torch::Tensor posTensorGPU = vpMGTs[i]->GetWorldPos();
+        torch::Tensor posTensorCPU = posTensorGPU.cpu();
+        Eigen::Vector3f posVecTmp(posTensorCPU.size(1), posTensorCPU.size(0));
+        std::copy(posTensorCPU.data_ptr<float>(), posTensorCPU.data_ptr<float>() + posTensorCPU.numel(), posVecTmp.data());
+        Eigen::Vector3f posVec = posVecTmp.transpose();
+        glVertex3f(posVec(0),posVec(1),posVec(2));
     }
     glEnd();
 }

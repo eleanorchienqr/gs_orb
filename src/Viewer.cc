@@ -320,8 +320,10 @@ void Viewer::Run()
             mpMapDrawer->DrawKeyFrames(menuShowKeyFrames,menuShowGraph, menuShowInertialGraph, menuShowOptLba);
         if(menuShowPoints)
             mpMapDrawer->DrawMapPoints();
+        #ifdef GAUSSIANSPLATTING
         if(menuShowGaussians)
             mpMapDrawer->DrawMapGaussians();
+        #endif
 
         pangolin::FinishFrame();
 

@@ -2564,26 +2564,33 @@ void Tracking::CreateInitialMapMonocular()
         // std::cout << "-------------Create corresponding MapGaussian in CreateInitialMapMonocular------------" << std::endl;
         // torch::Tensor tensor = torch::ones(3);
         // std::cout << tensor << std::endl;
+        #ifdef GAUSSIANSPLATTING
         MapGaussian* pMG = new MapGaussian(worldPos,pKFcur,mpAtlas->GetCurrentMap());
         MapGaussianTree* pMGT =  new MapGaussianTree(pMG);
 
         pKFini->AddMapGaussianTree(pMGT,i);
         pKFcur->AddMapGaussianTree(pMGT,mvIniMatches[i]);
-
+        #endif
 
         //Fill Current Frame structure
         mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
+        #ifdef GAUSSIANSPLATTING
         mCurrentFrame.mvpMapGaussianForest[mvIniMatches[i]] = pMGT;
+        #endif
         mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
 
         //Add to Map
         mpAtlas->AddMapPoint(pMP);
+        #ifdef GAUSSIANSPLATTING
         mpAtlas->AddMapGaussianTree(pMGT);
+        #endif
     }
 
     // Gaussian Scale Setting
+    #ifdef GAUSSIANSPLATTING
     // std::vector<MapGaussian*> vpAllMapGaussans = mpAtlas->GetAllMapGaussians();
     mpAtlas->InitializeGaussianScale();
+    #endif
 
     // Update Connections
     pKFini->UpdateConnections();
@@ -2594,7 +2601,9 @@ void Tracking::CreateInitialMapMonocular()
 
     // Bundle Adjustment
     Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
+    #ifdef GAUSSIANSPLATTING
     Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapGaussianTreesInMap()) + " gaussian trees", Verbose::VERBOSITY_QUIET);
+    #endif
     Optimizer::GlobalBundleAdjustemnt(mpAtlas->GetCurrentMap(),20);
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
