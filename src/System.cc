@@ -213,6 +213,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpGaussianMapper = new GaussianMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
                                         mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
     mptGaussianMapping = new thread(&ORB_SLAM3::GaussianMapping::Run,mpGaussianMapper);
+    mpGaussianMapper->mInitFr = initFr;
     #endif
 
     //Initialize the Loop Closing thread and launch
@@ -223,12 +224,19 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //Set pointers between threads
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
+    mpTracker->SetGaussianMapper(mpGaussianMapper);
 
     mpLocalMapper->SetTracker(mpTracker);
     mpLocalMapper->SetLoopCloser(mpLoopCloser);
+    mpLocalMapper->SetGaussianMapper(mpGaussianMapper);
 
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
+    // mpLoopCloser->SetGaussianMapper(mpGaussianMapper);
+
+    // mpGaussianMapper->SetTracker(mpTracker);
+    // mpGaussianMapper->SetLocalMapper(mpLocalMapper);
+    // mpGaussianMapper->SetLoopClosing(mpLoopCloser);
 
     //usleep(10*1000*1000);
 

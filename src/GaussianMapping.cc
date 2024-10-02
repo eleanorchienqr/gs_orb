@@ -67,8 +67,40 @@ void GaussianMapping::SetTracker(Tracking *pTracker)
 void GaussianMapping::Run()
 {
 //    Map* pCurrentMap = mpAtlas->GetCurrentMap();
-   mpGUI->InitializeWindow();
-   mpGUI->Frame();
+    mbFinished = false;
+
+    while(1)
+    {
+        // Tracking will see that Local Mapping is busy
+        SetAcceptKeyFrames(false);
+        
+        std::cout << ">>>>>>>>KeyframesInQueu of GaussianMapping" << KeyframesInQueue() << std::endl;
+        // Check if there are keyframes in the queue
+        if(CheckNewKeyFrames() && !mbBadImu)
+        {
+            std::cout << ">>>>>>>>Start Gaussian Rendering " << std::endl;
+
+        }
+        else if(Stop() && !mbBadImu)
+        {
+
+        }
+
+        mpGUI->InitializeWindow();
+        mpGUI->Frame();
+
+        ResetIfRequested();
+
+        // Tracking will see that Local Mapping is busy
+        SetAcceptKeyFrames(true);
+
+        if(CheckFinish())
+            break;
+
+        usleep(3000);
+    }
+
+    SetFinish();
 }
 
 void GaussianMapping::InsertKeyFrame(KeyFrame *pKF)

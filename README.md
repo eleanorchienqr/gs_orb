@@ -25,5 +25,5 @@ Opencv 4.4 needs tiff 4.0;
 Python version should be checked. Version 3.7 is tested fine.
 
 ```
-cmake -DGAUSSIANSPLATTING=OFF ..
+cmake -DGAUSSIANSPLATTING=ON ..
 ```

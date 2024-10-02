@@ -27,6 +27,7 @@
 #include "FrameDrawer.h"
 #include "Atlas.h"
 #include "LocalMapping.h"
+#include "GaussianMapping.h"
 #include "LoopClosing.h"
 #include "Frame.h"
 #include "ORBVocabulary.h"
@@ -49,6 +50,7 @@ class Viewer;
 class FrameDrawer;
 class Atlas;
 class LocalMapping;
+class GaussianMapping;
 class LoopClosing;
 class System;
 class Settings;
@@ -76,6 +78,7 @@ public:
     void GrabImuData(const IMU::Point &imuMeasurement);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
+    void SetGaussianMapper(GaussianMapping* pGaussianMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
     void SetViewer(Viewer* pViewer);
     void SetStepByStep(bool bSet);
@@ -255,6 +258,7 @@ protected:
 
     //Other Thread Pointers
     LocalMapping* mpLocalMapper;
+    GaussianMapping* mpGaussianMapper;
     LoopClosing* mpLoopClosing;
 
     //ORB

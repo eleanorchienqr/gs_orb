@@ -1430,6 +1430,11 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
     mpLocalMapper=pLocalMapper;
 }
 
+void Tracking::SetGaussianMapper(GaussianMapping *pGaussianMapper)
+{
+    mpGaussianMapper=pGaussianMapper;
+}
+
 void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)
 {
     mpLoopClosing=pLoopClosing;
@@ -2650,6 +2655,12 @@ void Tracking::CreateInitialMapMonocular()
     mpLocalMapper->InsertKeyFrame(pKFini);
     mpLocalMapper->InsertKeyFrame(pKFcur);
     mpLocalMapper->mFirstTs=pKFcur->mTimeStamp;
+
+    #ifdef GAUSSIANSPLATTING
+    mpGaussianMapper->InsertKeyFrame(pKFini);
+    mpGaussianMapper->InsertKeyFrame(pKFcur);
+    mpGaussianMapper->mFirstTs=pKFcur->mTimeStamp;
+    #endif
 
     mCurrentFrame.SetPose(pKFcur->GetPose());
     mnLastKeyFrameId=mCurrentFrame.mnId;

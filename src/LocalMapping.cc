@@ -61,6 +61,11 @@ void LocalMapping::SetTracker(Tracking *pTracker)
     mpTracker=pTracker;
 }
 
+void LocalMapping::SetGaussianMapper(GaussianMapping* pGaussianMapper)
+{
+    mpGaussianMapper=pGaussianMapper;
+}
+
 void LocalMapping::Run()
 {
     mbFinished = false;
