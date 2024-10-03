@@ -2660,6 +2660,7 @@ void Tracking::CreateInitialMapMonocular()
     mpGaussianMapper->InsertKeyFrame(pKFini);
     mpGaussianMapper->InsertKeyFrame(pKFcur);
     mpGaussianMapper->mFirstTs=pKFcur->mTimeStamp;
+    // std::cout << ">>>>>>>KeyFrameInQueue in GS: " << mpGaussianMapper->KeyframesInQueue() <<std::endl;
     #endif
 
     mCurrentFrame.SetPose(pKFcur->GetPose());

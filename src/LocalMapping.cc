@@ -78,6 +78,8 @@ void LocalMapping::Run()
         // Check if there are keyframes in the queue
         if(CheckNewKeyFrames() && !mbBadImu)
         {
+            // std::cout << ">>>>>>>>Start LocalMappping " << std::endl;
+
 #ifdef REGISTER_TIMES
             double timeLBA_ms = 0;
             double timeKFCulling_ms = 0;

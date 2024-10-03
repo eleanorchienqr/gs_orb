@@ -22,6 +22,7 @@
 
 #include "KeyFrame.h"
 #include "Atlas.h"
+#include "LocalMapping.h"
 #include "LoopClosing.h"
 #include "Tracking.h"
 #include "KeyFrameDatabase.h"
@@ -37,6 +38,7 @@ namespace ORB_SLAM3
 class System;
 class Tracking;
 class LoopClosing;
+class LocalMapping;
 class Atlas;
 class RenderGUI;
 
@@ -49,6 +51,8 @@ public:
     void SetLoopCloser(LoopClosing* pLoopCloser);
 
     void SetTracker(Tracking* pTracker);
+
+    void SetLocalMapper(LocalMapping* pLocalMapper);
 
     // Main function
     void Run();
@@ -162,6 +166,7 @@ protected:
 
     LoopClosing* mpLoopCloser;
     Tracking* mpTracker;
+    LocalMapping* mpLocalMapper;
 
     // RenderGUI
     RenderGUI* mpGUI;

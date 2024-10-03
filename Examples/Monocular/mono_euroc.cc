@@ -137,7 +137,11 @@ int main(int argc, char **argv)
 
             // Pass the image to the SLAM system
             // cout << "tframe = " << tframe << endl;
+    #ifdef GAUSSIANSPLATTING
+            SLAM.TrackMonocularGS(im,tframe); 
+    #else
             SLAM.TrackMonocular(im,tframe); // TODO change to monocular_inertial
+    #endif
 
     #ifdef COMPILEDWITHC17
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
