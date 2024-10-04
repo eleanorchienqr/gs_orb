@@ -93,6 +93,10 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     SetPose(F.GetPose());
 
     mnOriginMapId = pMap->GetId();
+
+    //img
+    F.mIm.copyTo(mIm);
+    // std::cout << ">>Image data in KeyFrame: " << mnId << " : " << mIm.cols << "; " << mIm.rows << std::endl;
 }
 
 void KeyFrame::ComputeBoW()
@@ -374,6 +378,23 @@ vector<MapPoint*> KeyFrame::GetMapPointMatches()
 {
     unique_lock<mutex> lock(mMutexFeatures);
     return mvpMapPoints;
+}
+
+std::vector<MapGaussian*> KeyFrame::GetMapGaussians()
+{
+    unique_lock<mutex> lock(mMutexGaussians);
+    std::vector<MapGaussian*> AllMapGaussians;
+
+    for(size_t i=0; i<mvpMapGaussianForest.size(); i++)
+    {
+        MapGaussianTree* GaussianTree = mvpMapGaussianForest[i];
+        if (GaussianTree)
+        {
+            MapGaussian* pMG = GaussianTree->GetRoot()->data;
+            AllMapGaussians.push_back(pMG);
+        }
+    }
+    return AllMapGaussians;
 }
 
 MapPoint* KeyFrame::GetMapPoint(const size_t &idx)

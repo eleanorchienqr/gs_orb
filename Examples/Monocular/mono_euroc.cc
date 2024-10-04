@@ -105,6 +105,7 @@ int main(int argc, char **argv)
                      <<  vstrImageFilenames[seq][ni] << endl;
                 return 1;
             }
+            // std::cout << "1. imgsize in main: " << im.cols << ", " << im.rows << std:: endl;
 
             if(imageScale != 1.f)
             {
@@ -138,6 +139,7 @@ int main(int argc, char **argv)
             // Pass the image to the SLAM system
             // cout << "tframe = " << tframe << endl;
     #ifdef GAUSSIANSPLATTING
+            // std::cout << "2. imgsize before TrackMonocularGS: " << im.cols << ", " << im.rows << std:: endl;
             SLAM.TrackMonocularGS(im,tframe); 
     #else
             SLAM.TrackMonocular(im,tframe); // TODO change to monocular_inertial

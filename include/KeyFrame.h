@@ -46,6 +46,7 @@ namespace ORB_SLAM3
 class Map;
 class MapPoint;
 class MapGaussianTree;
+class MapGaussian;
 class Frame;
 class KeyFrameDatabase;
 
@@ -260,6 +261,9 @@ public:
     int TrackedMapPoints(const int &minObs);
     MapPoint* GetMapPoint(const size_t &idx);
 
+    //MapGaussian functions
+    std::vector<MapGaussian*> GetMapGaussians();
+
     // KeyPoint functions
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const bool bRight = false) const;
     bool UnprojectStereo(int i, Eigen::Vector3f &x3D);
@@ -376,6 +380,7 @@ public:
     // Calibration parameters
     const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
     cv::Mat mDistCoef;
+    cv::Mat mIm;
 
     // Number of KeyPoints
     const int N;
@@ -503,6 +508,7 @@ protected:
     std::mutex mMutexPose; // for pose, velocity and biases
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
+    std::mutex mMutexGaussians;
     std::mutex mMutexMap;
 
 public:

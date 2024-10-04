@@ -82,6 +82,7 @@ void GaussianMapping::Run()
         if(CheckNewKeyFrames())
         {
             std::cout << ">>>>>>>>Start Gaussian Rendering " << std::endl;
+            ProcessNewKeyFrame();
             mpGUI->InitializeWindow();
             mpGUI->Frame();
 
@@ -130,37 +131,49 @@ void GaussianMapping::ProcessNewKeyFrame()
     }
 
     // Compute Bags of Words structures
-    mpCurrentKeyFrame->ComputeBoW();
+    // mpCurrentKeyFrame->ComputeBoW();
 
-    // Associate MapPoints to the new keyframe and update normal and descriptor
-    const vector<MapPoint*> vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+    // render
+    const std::vector<MapGaussian*> vpMapGaussians = mpCurrentKeyFrame->GetMapGaussians();
+    std::cout << ">>>>>>>The numbers of Gaussians in initial KeyFrame: " << vpMapGaussians.size() << std::endl;
 
-    for(size_t i=0; i<vpMapPointMatches.size(); i++)
+    for(size_t i=0; i<vpMapGaussians.size(); i++)
     {
-        MapPoint* pMP = vpMapPointMatches[i];
-        if(pMP)
-        {
-            if(!pMP->isBad())
-            {
-                if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
-                {
-                    pMP->AddObservation(mpCurrentKeyFrame, i);
-                    pMP->UpdateNormalAndDepth();
-                    pMP->ComputeDistinctiveDescriptors();
-                }
-                else // this can only happen for new stereo points inserted by the Tracking
-                {
-                    mlpRecentAddedMapPoints.push_back(pMP);
-                }
-            }
-        }
+        MapGaussian* pMG = vpMapGaussians[i];
+        // if(pMP)
+        // {
+        //     if(!pMP->isBad())
+        //     {
+        //         if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+        //         {
+        //             pMP->AddObservation(mpCurrentKeyFrame, i);
+        //             pMP->UpdateNormalAndDepth();
+        //             pMP->ComputeDistinctiveDescriptors();
+        //         }
+        //         else // this can only happen for new stereo points inserted by the Tracking
+        //         {
+        //             mlpRecentAddedMapPoints.push_back(pMP);
+        //         }
+        //     }
+        // }
     }
 
-    // Update links in the Covisibility Graph
-    mpCurrentKeyFrame->UpdateConnections();
+    // GeometricCamera* pCamera1 = mpCurrentKeyFrame->mpCamera;
+    cv::Mat im;
+    mpCurrentKeyFrame->mIm.copyTo(im);
+    const Eigen::Matrix3f K = mpCurrentKeyFrame->mpCamera->toK_();
+    Sophus::SE3f Tcw = mpCurrentKeyFrame->GetPose();
 
-    // Insert Keyframe in Map
-    mpAtlas->AddKeyFrame(mpCurrentKeyFrame);
+    // std::cout << "Image bounds in KeyFrame: " << mpCurrentKeyFrame->mnMinX << ", " <<  mpCurrentKeyFrame->mnMinY << ", " << 
+    //               mpCurrentKeyFrame->mnMaxX << ", " << mpCurrentKeyFrame->mnMaxY << ", " << std::endl;
+    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : "<< im.cols << "; " << im.rows << std::endl;
+    // cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", im);
+
+    // Update links in the Covisibility Graph
+    // mpCurrentKeyFrame->UpdateConnections();
+
+    // // Insert Keyframe in Map
+    // mpAtlas->AddKeyFrame(mpCurrentKeyFrame);
 }
 
 void GaussianMapping::EmptyQueue()

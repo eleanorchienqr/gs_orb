@@ -1572,6 +1572,7 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
 Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename)
 {
     mImGray = im;
+
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -1586,6 +1587,8 @@ Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &times
         else
             cvtColor(mImGray,mImGray,cv::COLOR_BGRA2GRAY);
     }
+
+    // std::cout << "3. imgsize before Frame construction: " << mImGray.cols << ", " << mImGray.rows << std:: endl;
 
     if (mSensor == System::MONOCULAR)
     {
