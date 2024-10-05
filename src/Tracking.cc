@@ -2525,6 +2525,16 @@ void Tracking::MonocularInitialization()
             mInitialFrame.SetPose(Sophus::SE3f());
             mCurrentFrame.SetPose(Tcw);
 
+            // Pose verbose
+            // Eigen::Matrix<float,3,3> Rcw = Tcw.rotationMatrix();
+            // Eigen::Matrix<float,3,1> tcw = Tcw.translation();
+
+            // Eigen::Matrix4f c2w = Eigen::Matrix4f::Zero();
+            // c2w.block<3, 3>(0, 0) = Rcw;
+            // c2w.block<3, 1>(0, 3) = tcw;
+            // c2w(3, 3) = 1.0;
+            // std::cout << "Poses After ReconstructWithTwoViews: " << c2w << std::endl;
+
             CreateInitialMapMonocular();
         }
     }

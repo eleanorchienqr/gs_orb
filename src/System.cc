@@ -214,6 +214,17 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
                                         mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
     mptGaussianMapping = new thread(&ORB_SLAM3::GaussianMapping::Run,mpGaussianMapper);
     mpGaussianMapper->mInitFr = initFr;
+    if(settings_)
+        mpGaussianMapper->mThFarPoints = settings_->thFarPoints();
+    else
+        mpGaussianMapper->mThFarPoints = fsSettings["thFarPoints"];
+    if(mpGaussianMapper->mThFarPoints!=0)
+    {
+        cout << "Discard gaussians further than " << mpGaussianMapper->mThFarPoints << " m from current camera" << endl;
+        mpGaussianMapper->mbFarPoints = true;
+    }
+    else
+        mpGaussianMapper->mbFarPoints = false;
     #endif
 
     //Initialize the Loop Closing thread and launch

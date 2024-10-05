@@ -80,6 +80,10 @@ class MapGaussian
         
         // Getters
         torch::Tensor GetWorldPos();
+        torch::Tensor GetOpacity();
+        torch::Tensor GetScale();
+        torch::Tensor GetRotation();
+        torch::Tensor GetFeature();
         // void SetCov(const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale);
         // Eigen::Matrix3d GetCov();
 

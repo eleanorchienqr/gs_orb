@@ -5,7 +5,7 @@
 // #include "camera.cuh"
 // #include "gaussian.cuh"
 // #include "parameters.cuh"
-// #include "rasterizer.cuh"
+// #include "Rasterizer.cuh"
 // #include "sh_utils.cuh"
 // #include <cmath>
 // #include <torch/torch.h>

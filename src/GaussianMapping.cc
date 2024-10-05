@@ -25,6 +25,8 @@
 #include "Converter.h"
 #include "GeometricTools.h"
 
+#include "Rasterizer.h"
+
 #include<mutex>
 #include<chrono>
 
@@ -108,6 +110,49 @@ void GaussianMapping::Run()
     // SetFinish();
 }
 
+torch::Tensor GaussianMapping::GetViewMatrix(Sophus::SE3f &Tcw)
+{  
+    Sophus::SE3f Twc = Tcw.inverse();
+    Eigen::Matrix<float,3,3> Rwc = Twc.rotationMatrix();
+    Eigen::Matrix<float,3,1> twc = Twc.translation();
+
+    Eigen::Matrix4f W2C = Eigen::Matrix4f::Zero();
+    W2C.block<3, 3>(0, 0) = Rwc;
+    W2C.block<3, 1>(0, 3) = twc;
+    W2C(3, 3) = 1.0;
+    // Here we create a torch::Tensor from the Eigen::Matrix
+    // Note that the tensor will be on the CPU, you may want to move it to the desired device later
+    auto W2CTensor = torch::from_blob(W2C.data(), {4, 4}, torch::kFloat);
+    // clone the tensor to allocate new memory, as from_blob shares the same memory
+    // this step is important if Rt will go out of scope and the tensor will be used later
+    return W2CTensor.clone();
+}
+
+torch::Tensor GaussianMapping::GetProjMatrix(const float &znear, const float &zfar, const float &tanfovx, const float &tanfovy)
+{
+    float top = tanfovy * znear;
+    float bottom = -top;
+    float right = tanfovx * znear;
+    float left = -right;
+
+    Eigen::Matrix4f P = Eigen::Matrix4f::Zero();
+
+    float z_sign = 1.f;
+
+    P(0, 0) = 2.f * znear / (right - left);
+    P(1, 1) = 2.f * znear / (top - bottom);
+    P(0, 2) = (right + left) / (right - left);
+    P(1, 2) = (top + bottom) / (top - bottom);
+    P(3, 2) = z_sign;
+    P(2, 2) = z_sign * zfar / (zfar - znear);
+    P(2, 3) = -(zfar * znear) / (zfar - znear);
+
+    // create torch::Tensor from Eigen::Matrix
+    auto PTensor = torch::from_blob(P.data(), {4, 4}, torch::kFloat);
+    // clone the tensor to allocate new memory
+    return PTensor.clone();
+}
+
 void GaussianMapping::InsertKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexNewKFs);
@@ -137,36 +182,107 @@ void GaussianMapping::ProcessNewKeyFrame()
     const std::vector<MapGaussian*> vpMapGaussians = mpCurrentKeyFrame->GetMapGaussians();
     std::cout << ">>>>>>>The numbers of Gaussians in initial KeyFrame: " << vpMapGaussians.size() << std::endl;
 
+    const int SizeofGaussians = vpMapGaussians.size();
+    torch::Tensor Means3D = torch::zeros({SizeofGaussians, 3});
+    torch::Tensor Opacity = torch::zeros({SizeofGaussians, 1});
+    torch::Tensor Scales = torch::zeros({SizeofGaussians, 3});
+    torch::Tensor Rotation = torch::zeros({SizeofGaussians, 4});
+    torch::Tensor Means2D = torch::zeros({SizeofGaussians, 2});
+    torch::Tensor Features = torch::zeros({SizeofGaussians, 3, static_cast<long>(std::pow((10 + 1), 2))});
+    auto cov3D_precomp = torch::Tensor();
+    torch::Tensor colors_precomp = torch::Tensor();
+
     for(size_t i=0; i<vpMapGaussians.size(); i++)
     {
         MapGaussian* pMG = vpMapGaussians[i];
-        // if(pMP)
-        // {
-        //     if(!pMP->isBad())
-        //     {
-        //         if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
-        //         {
-        //             pMP->AddObservation(mpCurrentKeyFrame, i);
-        //             pMP->UpdateNormalAndDepth();
-        //             pMP->ComputeDistinctiveDescriptors();
-        //         }
-        //         else // this can only happen for new stereo points inserted by the Tracking
-        //         {
-        //             mlpRecentAddedMapPoints.push_back(pMP);
-        //         }
-        //     }
-        // }
+        if(pMG)
+        {
+            Means3D.index_put_({(int)i, "..."},  pMG->GetWorldPos());
+            Opacity.index_put_({(int)i, "..."},  pMG->GetOpacity());
+            Scales.index_put_({(int)i, "..."},   pMG->GetScale());
+            Rotation.index_put_({(int)i, "..."}, pMG->GetRotation());
+            Features.index_put_({(int)i, "..."}, pMG->GetFeature());
+            // if(!pMP->isBad())
+            // {
+            //     if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+            //     {
+            //         pMP->AddObservation(mpCurrentKeyFrame, i);
+            //         pMP->UpdateNormalAndDepth();
+            //         pMP->ComputeDistinctiveDescriptors();
+            //     }
+            //     else // this can only happen for new stereo points inserted by the Tracking
+            //     {
+            //         mlpRecentAddedMapPoints.push_back(pMP);
+            //     }
+            // }
+        }
     }
 
-    // GeometricCamera* pCamera1 = mpCurrentKeyFrame->mpCamera;
+    // std::cout << "Gaussian data in KeyFrame (Gaussian Mapping)" << "; Means3D " << Means3D << std::endl;
+    // std::cout << "Gaussian data in KeyFrame (Gaussian Mapping)" << "; Scales " << Scales << std::endl;
+    // std::cout << "Gaussian data in KeyFrame (Gaussian Mapping)" << "; Features " << Features << std::endl;
+
+
+    // Fetch Camera Info
     cv::Mat im;
     mpCurrentKeyFrame->mIm.copyTo(im);
+    const int imWidth = im.cols;
+    const int imHeight = im.rows;
+
     const Eigen::Matrix3f K = mpCurrentKeyFrame->mpCamera->toK_();
     Sophus::SE3f Tcw = mpCurrentKeyFrame->GetPose();
 
-    // std::cout << "Image bounds in KeyFrame: " << mpCurrentKeyFrame->mnMinX << ", " <<  mpCurrentKeyFrame->mnMinY << ", " << 
-    //               mpCurrentKeyFrame->mnMaxX << ", " << mpCurrentKeyFrame->mnMaxY << ", " << std::endl;
-    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : "<< im.cols << "; " << im.rows << std::endl;
+    const float tanfovx = std::tan(focal2fov(mpCurrentKeyFrame->fx, imWidth) * 0.5f);
+    const float tanfovy = std::tan(focal2fov(mpCurrentKeyFrame->fy, imHeight) * 0.5f);
+    torch::Tensor ViewMatrix = GetViewMatrix(Tcw);
+
+    float far;
+    if(mbFarPoints)
+        far = mThFarPoints;
+    else
+        far = 100.f;
+    const float near = 0.01f;
+    torch::Tensor ProjMatrix = GetProjMatrix(near, far, tanfovx, tanfovy);
+    torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(ProjMatrix.unsqueeze(0)).squeeze(0);
+    torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
+
+    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << "; ViewMatrix " << ViewMatrix << std::endl;
+    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << "; ProjMatrix " << FullProjMatrix << std::endl;
+
+    // Set up rasterization configuration
+    GaussianRasterizationSettings raster_settings = {
+        .image_height = imHeight,
+        .image_width = imWidth,
+        .tanfovx = tanfovx,
+        .tanfovy = tanfovy,
+        .bg = torch::tensor({1.f, 1.f, 1.f}),
+        .scale_modifier = 1.f,
+        .viewmatrix = ViewMatrix,
+        .projmatrix = FullProjMatrix,
+        .sh_degree = 10,
+        .camera_center = CamCenter,
+        .prefiltered = false};
+    
+    GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+
+    torch::cuda::synchronize();
+
+    auto [rendererd_image, radii] = rasterizer.forward(
+        Means3D,
+        Means2D,
+        Opacity,
+        Features,
+        colors_precomp,
+        Scales,
+        Rotation,
+        cov3D_precomp);
+
+    torch::Tensor RenderIm = rendererd_image.permute({1, 2, 0}).cpu();
+    cv::Mat RenderImCV = cv::Mat(imHeight, imWidth, CV_8UC3, RenderIm.data_ptr());
+    cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", RenderImCV);
+    std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : rendererd_image size "<< RenderIm <<std::endl;
+    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : Twc "<< Tcw.inverse() << "; ViewMatrix " << ViewMatrix <<std::endl;
+
     // cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", im);
 
     // Update links in the Covisibility Graph

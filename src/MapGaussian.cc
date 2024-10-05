@@ -45,7 +45,7 @@ MapGaussian::MapGaussian(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap
 
     Eigen::Vector3f PosTranspose = Pos.transpose();
     mWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA);
-    mWorldRot = torch::zeros({1, 4}).to(torch::kCUDA, true);
+    mWorldRot = torch::zeros({1, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
     mOpacity = inverse_sigmoid(0.5 * torch::ones({1, 1})).to(torch::kCUDA, true);
     mFeatureDC = torch::ones({1, 3}).to(torch::kCUDA, true);
     mFeaturest = torch::zeros({1, FeaturestDim}).to(torch::kCUDA, true);
@@ -96,6 +96,33 @@ torch::Tensor MapGaussian::GetWorldPos()
 {
     unique_lock<mutex> lock(mMutexPos);
     return mWorldPos;
+}
+
+torch::Tensor MapGaussian::GetOpacity()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    return mOpacity;
+}
+
+torch::Tensor MapGaussian::GetScale()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    return mScale;
+}
+
+torch::Tensor MapGaussian::GetRotation()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    return mWorldRot;
+}
+
+torch::Tensor MapGaussian::GetFeature()
+{
+    unique_lock<mutex> lock(mMutexPos);
+    torch::Tensor Features = torch::zeros({1, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))});
+    Features.index_put_({torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, 3), 0}, mFeatureDC);
+    Features.index_put_({torch::indexing::Slice(), torch::indexing::Slice(3, torch::indexing::None), torch::indexing::Slice(1, torch::indexing::None)}, 0.0);
+    return Features;
 }
 
 Map* MapGaussian::GetMap()

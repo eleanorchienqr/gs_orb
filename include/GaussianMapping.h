@@ -29,6 +29,7 @@
 #include "Settings.h"
 #include "RenderGUI.h"
 
+#include <torch/torch.h>
 #include <mutex>
 
 
@@ -56,6 +57,14 @@ public:
 
     // Main function
     void Run();
+
+    // Utils
+    inline float focal2fov(const float focal, const int pixels) {
+        return 2 * std::atan(static_cast<float>(pixels) / (2.f * focal));
+    }
+    
+    torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
+    torch::Tensor GetProjMatrix(const float &znear, const float &zfar, const float &tanfovx, const float &tanfovy);
 
     void InsertKeyFrame(KeyFrame* pKF);
     void EmptyQueue();
