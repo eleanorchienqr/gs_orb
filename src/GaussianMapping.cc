@@ -24,6 +24,7 @@
 #include "Optimizer.h"
 #include "Converter.h"
 #include "GeometricTools.h"
+#include "Config.h"
 
 #include "Rasterizer.h"
 
@@ -75,6 +76,7 @@ void GaussianMapping::Run()
 {
 //    Map* pCurrentMap = mpAtlas->GetCurrentMap();
     // mbFinished = false;
+    ORB_SLAM3::OptimizationParameters OptimParams;
 
     while(1)
     {
@@ -85,17 +87,10 @@ void GaussianMapping::Run()
         {
             std::cout << ">>>>>>>>Start Gaussian Rendering " << std::endl;
             ProcessNewKeyFrame();
+
             mpGUI->InitializeWindow();
             mpGUI->Frame();
-
         }
-        // else if(Stop() && !mbBadImu)
-        // {
-
-        // }
-
-        
-
         // ResetIfRequested();
 
         // // Tracking will see that Local Mapping is busy
@@ -175,9 +170,6 @@ void GaussianMapping::ProcessNewKeyFrame()
         mlNewKeyFrames.pop_front();
     }
 
-    // Compute Bags of Words structures
-    // mpCurrentKeyFrame->ComputeBoW();
-
     // render
     const std::vector<MapGaussian*> vpMapGaussians = mpCurrentKeyFrame->GetMapGaussians();
     std::cout << ">>>>>>>The numbers of Gaussians in initial KeyFrame: " << vpMapGaussians.size() << std::endl;
@@ -207,8 +199,6 @@ void GaussianMapping::ProcessNewKeyFrame()
             //     if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
             //     {
             //         pMP->AddObservation(mpCurrentKeyFrame, i);
-            //         pMP->UpdateNormalAndDepth();
-            //         pMP->ComputeDistinctiveDescriptors();
             //     }
             //     else // this can only happen for new stereo points inserted by the Tracking
             //     {
@@ -217,11 +207,6 @@ void GaussianMapping::ProcessNewKeyFrame()
             // }
         }
     }
-
-    // std::cout << "Gaussian data in KeyFrame (Gaussian Mapping)" << "; Means3D " << Means3D << std::endl;
-    // std::cout << "Gaussian data in KeyFrame (Gaussian Mapping)" << "; Scales " << Scales << std::endl;
-    // std::cout << "Gaussian data in KeyFrame (Gaussian Mapping)" << "; Features " << Features << std::endl;
-
 
     // Fetch Camera Info
     cv::Mat im;
@@ -277,10 +262,10 @@ void GaussianMapping::ProcessNewKeyFrame()
         Rotation,
         cov3D_precomp);
 
-    torch::Tensor RenderIm = rendererd_image.permute({1, 2, 0}).cpu();
+    torch::Tensor RenderIm = rendererd_image.permute({1, 2, 0}).cpu(); // [3, h, w] -> [h, w, 3]
     cv::Mat RenderImCV = cv::Mat(imHeight, imWidth, CV_8UC3, RenderIm.data_ptr());
-    cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", RenderImCV);
-    std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : rendererd_image size "<< RenderIm <<std::endl;
+    // cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", RenderImCV);
+    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : rendererd_image size "<< RenderIm <<std::endl;
     // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : Twc "<< Tcw.inverse() << "; ViewMatrix " << ViewMatrix <<std::endl;
 
     // cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", im);

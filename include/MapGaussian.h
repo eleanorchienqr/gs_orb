@@ -57,14 +57,9 @@ class MapGaussian
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         MapGaussian();
-        // MapGaussian(const long unsigned int SHDegree);
+
         // Initialization from associated MapPoints
         MapGaussian(const Eigen::Vector3f &Pos, KeyFrame* pRefKF, Map* pMap); 
-        // MapGaussian(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
-        //             const float &Opacity,const Eigen::Vector3f &FeatureDC, KeyFrame* pRefKF, Map* pMap);
-
-        // MapPoint(const double invDepth, cv::Point2f uv_init, KeyFrame* pRefKF, KeyFrame* pHostKF, Map* pMap);
-        // MapPoint(const Eigen::Vector3f &Pos,  Map* pMap, Frame* pFrame, const int &idxF);
 
         //utils
         inline torch::Tensor inverse_sigmoid(torch::Tensor x) {
@@ -73,8 +68,7 @@ class MapGaussian
 
         
         //Setters
-        // void SetGaussianParam(const Eigen::Vector3f &Pos, const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale, 
-        //                       const float &Opacity,const Eigen::Vector3f &FeatureDC);
+        void SetWorldPos(const Eigen::Vector3f &Pos);
         void SetScale(const torch::Tensor &Scale);
         // void SetWorldPos(const Eigen::Vector3f &Pos);
         
@@ -86,9 +80,6 @@ class MapGaussian
         torch::Tensor GetFeature();
         // void SetCov(const Eigen::Vector4f &Rot, const Eigen::Vector3f &Scale);
         // Eigen::Matrix3d GetCov();
-
-        // void SetOpacity(const float &Opacity);
-        // float GetOpacity();
 
         // void SetSHParam(const Eigen::Vector3f &FeatureDC);
         // Eigen::Vector3f GetSHParam();

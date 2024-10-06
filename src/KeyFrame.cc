@@ -21,6 +21,9 @@
 #include "ImuTypes.h"
 #include<mutex>
 
+#include <Thirdparty/simple-knn/spatial.h>
+#include <torch/torch.h>
+
 namespace ORB_SLAM3
 {
 
@@ -395,6 +398,36 @@ std::vector<MapGaussian*> KeyFrame::GetMapGaussians()
         }
     }
     return AllMapGaussians;
+}
+
+void KeyFrame::UpdateGaussianScale()
+{
+    unique_lock<mutex> lock(mMutexGaussians);
+    std::vector<MapGaussian*> vpAllMapGaussians = GetMapGaussians();
+    int vpMapGaussianSize = vpAllMapGaussians.size();
+    torch::Tensor vpAllGaussianPos = torch::zeros({vpMapGaussianSize, 3}).to(torch::kCUDA, true);
+    for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
+    {
+        if(vpAllMapGaussians[iMG])
+        {
+            MapGaussian* pMG = vpAllMapGaussians[iMG];
+            torch::Tensor WorldPos = pMG->GetWorldPos();
+            vpAllGaussianPos.index_put_({(int)iMG, "..."}, WorldPos);
+        }
+    }
+
+    auto dist2 = torch::clamp_min(distCUDA2(vpAllGaussianPos), 0.0000001);
+    auto _scaling = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
+    
+    for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
+    {
+        if(vpAllMapGaussians[iMG])
+        {
+            MapGaussian* pMG = vpAllMapGaussians[iMG];
+            torch::Tensor scale = _scaling.index({(int)iMG, "..."});
+            pMG->SetScale(scale);
+        }
+    }
 }
 
 MapPoint* KeyFrame::GetMapPoint(const size_t &idx)

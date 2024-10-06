@@ -92,6 +92,14 @@ MapGaussian::MapGaussian(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap
 //     mFeatureDC = FeatureDC;
 // }
 
+void MapGaussian::SetWorldPos(const Eigen::Vector3f &Pos)
+{
+    unique_lock<mutex> lock(mMutexPos);
+    Eigen::Vector3f PosTranspose = Pos.transpose();
+    const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
+    mWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA);
+}
+
 torch::Tensor MapGaussian::GetWorldPos()
 {
     unique_lock<mutex> lock(mMutexPos);

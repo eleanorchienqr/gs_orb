@@ -127,7 +127,7 @@ void Map::InitializeGaussianScale()
     //         std::cout << "Scale of Gaussians in Map.cc: " << AllGaussianScale.row(iMG) << std::endl;
     //     }
     // }
-
+    std::cout << "InitializeGaussianScale Test" <<std::endl;
     std::vector<MapGaussian*> vpAllMapGaussians = GetAllMapGaussians();
     int vpMapGaussianSize = vpAllMapGaussians.size();
     torch::Tensor vpAllGaussianPos = torch::zeros({vpMapGaussianSize, 3}).to(torch::kCUDA, true);

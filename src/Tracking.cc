@@ -2580,8 +2580,6 @@ void Tracking::CreateInitialMapMonocular()
 
         //Create corresponding MapGaussian
         // std::cout << "-------------Create corresponding MapGaussian in CreateInitialMapMonocular------------" << std::endl;
-        // torch::Tensor tensor = torch::ones(3);
-        // std::cout << tensor << std::endl;
         #ifdef GAUSSIANSPLATTING
         MapGaussian* pMG = new MapGaussian(worldPos,pKFcur,mpAtlas->GetCurrentMap());
         MapGaussianTree* pMGT =  new MapGaussianTree(pMG);
@@ -2592,9 +2590,11 @@ void Tracking::CreateInitialMapMonocular()
 
         //Fill Current Frame structure
         mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
+
         #ifdef GAUSSIANSPLATTING
         mCurrentFrame.mvpMapGaussianForest[mvIniMatches[i]] = pMGT;
         #endif
+
         mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
 
         //Add to Map
@@ -2643,8 +2643,14 @@ void Tracking::CreateInitialMapMonocular()
     Tc2w.translation() *= invMedianDepth;
     pKFcur->SetPose(Tc2w);
 
-    // Scale points
+    // Scale points and Gaussians
     vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
+
+    #ifdef GAUSSIANSPLATTING
+    std::vector<MapGaussian*> vpAllMapGaussians = pKFini->GetMapGaussians();
+    int iMG = 0;
+    #endif
+    
     for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
     {
         if(vpAllMapPoints[iMP])
@@ -2652,8 +2658,21 @@ void Tracking::CreateInitialMapMonocular()
             MapPoint* pMP = vpAllMapPoints[iMP];
             pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
             pMP->UpdateNormalAndDepth();
+
+            #ifdef GAUSSIANSPLATTING
+            iMG++;
+            MapGaussian* pMG = vpAllMapGaussians[iMG];
+            pMG->SetWorldPos(pMP->GetWorldPos());
+            #endif
         }
     }
+
+    // Gaussian Scale Setting
+    // #ifdef GAUSSIANSPLATTING
+    // // std::vector<MapGaussian*> vpAllMapGaussans = mpAtlas->GetAllMapGaussians();
+    // pKFini->UpdateGaussianScale();
+    // // pKFcur->UpdateConnections();
+    // #endif
 
     if (mSensor == System::IMU_MONOCULAR)
     {

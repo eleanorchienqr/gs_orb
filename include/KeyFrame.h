@@ -263,6 +263,7 @@ public:
 
     //MapGaussian functions
     std::vector<MapGaussian*> GetMapGaussians();
+    void UpdateGaussianScale();
 
     // KeyPoint functions
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const bool bRight = false) const;
