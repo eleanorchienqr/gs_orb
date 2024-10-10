@@ -24,7 +24,6 @@
 #include "Optimizer.h"
 #include "Converter.h"
 #include "GeometricTools.h"
-#include "Config.h"
 
 #include "Rasterizer.h"
 
@@ -76,8 +75,7 @@ void GaussianMapping::Run()
 {
 //    Map* pCurrentMap = mpAtlas->GetCurrentMap();
     // mbFinished = false;
-    ORB_SLAM3::OptimizationParameters OptimParams;
-
+    
     while(1)
     {
         // Tracking will see that Local Mapping is busy
@@ -86,7 +84,7 @@ void GaussianMapping::Run()
         if(CheckNewKeyFrames())
         {
             std::cout << ">>>>>>>>Start Gaussian Rendering " << std::endl;
-            ProcessNewKeyFrame();
+            // ProcessNewKeyFrame();
 
             mpGUI->InitializeWindow();
             mpGUI->Frame();

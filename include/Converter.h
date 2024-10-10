@@ -74,6 +74,10 @@ public:
     //TODO: Sophus migration, to be deleted in the future
     static Sophus::SE3<float> toSophus(const cv::Mat& T);
     static Sophus::Sim3f toSophus(const g2o::Sim3& S);
+
+    inline static float Focal2Fov(const float focal, const int pixels) {
+        return 2 * std::atan(static_cast<float>(pixels) / (2.f * focal));
+    }
 };
 
 }// namespace ORB_SLAM

@@ -400,6 +400,15 @@ std::vector<MapGaussian*> KeyFrame::GetMapGaussians()
     return AllMapGaussians;
 }
 
+void KeyFrame::GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy)
+{
+    ImWidth = mIm.cols;
+    ImHeight = mIm.rows;
+
+    TanFovx = std::tan(Converter::Focal2Fov(fx, ImWidth) * 0.5f);
+    TanFovy = std::tan(Converter::Focal2Fov(fy, ImHeight) * 0.5f);
+}
+
 void KeyFrame::UpdateGaussianScale()
 {
     unique_lock<mutex> lock(mMutexGaussians);

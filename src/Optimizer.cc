@@ -40,7 +40,9 @@
 #include<mutex>
 
 #include "OptimizableTypes.h"
+#include "GaussianOptimizer.h"
 
+// using namespace GaussianSplatting;
 
 namespace ORB_SLAM3
 {
@@ -5585,6 +5587,27 @@ void Optimizer::OptimizeEssentialGraph4DoF(Map* pMap, KeyFrame* pLoopKF, KeyFram
         pMP->UpdateNormalAndDepth();
     }
     pMap->IncreaseChangeIndex();
+}
+
+void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, bool *pbStopFlag,
+                                       const unsigned long nLoopKF, const bool bRobust)
+{
+    vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
+    vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
+    vector<MapGaussian*> vpMG = pMap->GetAllMapGaussians();
+    // BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
+    GaussianOptimization(vpKFs,vpMP,vpMG,nIterations,pbStopFlag, nLoopKF, bRobust);
+
+}
+
+void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, const vector<MapGaussian *> &vpMG, 
+                                 int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+{
+    ORB_SLAM3::OptimizationParameters OptimParams;
+    GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
+    optimizer.InitializeOptimization(vpKFs, vpMG);
+    // optimizer.optimize(nIteration)
+
 }
 
 } //namespace ORB_SLAM

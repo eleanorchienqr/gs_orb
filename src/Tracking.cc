@@ -2622,7 +2622,10 @@ void Tracking::CreateInitialMapMonocular()
     #ifdef GAUSSIANSPLATTING
     Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapGaussianTreesInMap()) + " gaussian trees", Verbose::VERBOSITY_QUIET);
     #endif
+
     Optimizer::GlobalBundleAdjustemnt(mpAtlas->GetCurrentMap(),20);
+    // Gaussian Optimizer
+    Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200);
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
     float invMedianDepth;
@@ -2646,10 +2649,10 @@ void Tracking::CreateInitialMapMonocular()
     // Scale points and Gaussians
     vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
 
-    #ifdef GAUSSIANSPLATTING
-    std::vector<MapGaussian*> vpAllMapGaussians = pKFini->GetMapGaussians();
-    int iMG = 0;
-    #endif
+    // #ifdef GAUSSIANSPLATTING
+    // std::vector<MapGaussian*> vpAllMapGaussians = pKFini->GetMapGaussians();
+    // int iMG = 0;
+    // #endif
     
     for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
     {
@@ -2659,15 +2662,15 @@ void Tracking::CreateInitialMapMonocular()
             pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
             pMP->UpdateNormalAndDepth();
 
-            #ifdef GAUSSIANSPLATTING
-            iMG++;
-            MapGaussian* pMG = vpAllMapGaussians[iMG];
-            pMG->SetWorldPos(pMP->GetWorldPos());
-            #endif
+            // #ifdef GAUSSIANSPLATTING
+            // iMG++;
+            // MapGaussian* pMG = vpAllMapGaussians[iMG];
+            // pMG->SetWorldPos(pMP->GetWorldPos());
+            // #endif
         }
     }
 
-    // Gaussian Scale Setting
+    // Gaussian Training Setup
     // #ifdef GAUSSIANSPLATTING
     // // std::vector<MapGaussian*> vpAllMapGaussans = mpAtlas->GetAllMapGaussians();
     // pKFini->UpdateGaussianScale();

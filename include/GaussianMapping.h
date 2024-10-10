@@ -28,6 +28,7 @@
 #include "KeyFrameDatabase.h"
 #include "Settings.h"
 #include "RenderGUI.h"
+#include "Config.h"
 
 #include <torch/torch.h>
 #include <mutex>
@@ -179,6 +180,11 @@ protected:
 
     // RenderGUI
     RenderGUI* mpGUI;
+
+    // Train
+    ORB_SLAM3::OptimizationParameters mOptimParams;
+    std::unique_ptr<torch::optim::Adam> mOptimizer;
+    // void TrainingSetup(_xyz, _features_dc, _features_rest, _scaling, _rotation, _opacity);
 
     std::list<KeyFrame*> mlNewKeyFrames;
 

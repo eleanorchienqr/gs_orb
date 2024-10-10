@@ -263,6 +263,7 @@ public:
 
     //MapGaussian functions
     std::vector<MapGaussian*> GetMapGaussians();
+    void GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy);
     void UpdateGaussianScale();
 
     // KeyPoint functions

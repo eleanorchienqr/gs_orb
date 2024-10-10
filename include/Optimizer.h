@@ -25,8 +25,10 @@
 #include "KeyFrame.h"
 #include "LoopClosing.h"
 #include "Frame.h"
+#include "Config.h"
 
 #include <math.h>
+#include <torch/torch.h>
 
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/core/sparse_block_matrix.h"
@@ -46,7 +48,6 @@ class LoopClosing;
 class Optimizer
 {
 public:
-
     void static BundleAdjustment(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
                                  int nIterations = 5, bool *pbStopFlag=NULL, const unsigned long nLoopKF=0,
                                  const bool bRobust = true);
@@ -98,7 +99,17 @@ public:
     void static InertialOptimization(Map *pMap, Eigen::Vector3d &bg, Eigen::Vector3d &ba, float priorG = 1e2, float priorA = 1e6);
     void static InertialOptimization(Map *pMap, Eigen::Matrix3d &Rwg, double &scale);
 
+    // Gaussian Optimization
+    void static GlobalGaussianOptimization(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL,
+                                       const unsigned long nLoopKF=0, const bool bRobust = true);
+    void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, 
+                              const vector<MapGaussian *> &vpMG, int nIterations, bool* pbStopFlag, 
+                              const unsigned long nLoopKF, const bool bRobust);
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+protected:
+    ORB_SLAM3::OptimizationParameters mOptimParams;
 };
 
 } //namespace ORB_SLAM3

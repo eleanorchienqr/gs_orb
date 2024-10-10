@@ -127,6 +127,7 @@ src/Renderer/GaussianRenderer.cpp
 src/Renderer/RenderGUI.cpp
 src/Renderer/Rasterizer.cpp
 src/Renderer/RasterizePoints.cpp
+src/Renderer/GaussianOptimizer.cpp
 src/Renderer/cuda_rasterizer/backward.cu
 src/Renderer/cuda_rasterizer/forward.cu
 src/Renderer/cuda_rasterizer/rasterizer_impl.cu
@@ -173,6 +174,7 @@ include/Renderer/debug_utils.h
 include/Renderer/Rasterizer.h
 include/Renderer/RasterizePoints.h
 include/Renderer/RenderUtils.h
+include/Renderer/GaussianOptimizer.h
 include/Renderer/cuda_rasterizer/auxiliary.h
 include/Renderer/cuda_rasterizer/backward.h
 include/Renderer/cuda_rasterizer/config.h
