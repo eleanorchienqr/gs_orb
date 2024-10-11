@@ -1,6 +1,29 @@
 #include "GaussianOptimizer.h"
+#include "Renderer/Rasterizer.h"
 
 namespace GaussianSplatting{
+
+float LossMonitor::Update(float newLoss) {
+    if (_loss_buffer.size() >= _buffer_size) {
+        _loss_buffer.pop_front();
+        _rate_of_change_buffer.pop_front();
+    }
+    const bool buffer_empty = _loss_buffer.empty();
+    const float rateOfChange = buffer_empty ? 0.f : std::abs(newLoss - _loss_buffer.back());
+    _rate_of_change_buffer.push_back(rateOfChange);
+    _loss_buffer.push_back(newLoss);
+
+    // return average rate of change
+    return buffer_empty ? 0.f : std::accumulate(_rate_of_change_buffer.begin(), _rate_of_change_buffer.end(), 0.f) / _rate_of_change_buffer.size();
+}
+
+bool LossMonitor::IsConverging(float threshold) {
+    if (_rate_of_change_buffer.size() < _buffer_size) {
+        return false;
+    }
+    return std::accumulate(_rate_of_change_buffer.begin(), _rate_of_change_buffer.end(), 0.f) / _rate_of_change_buffer.size() <= threshold;
+}
+
 
 GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &OptimParams):
     mOptimParams(OptimParams)
@@ -35,11 +58,15 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
         }
     }
 
+    mFeaturesDC = mFeatures.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 1)}).transpose(1, 2);
+    mFeaturesRest = mFeatures.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None)}).transpose(1, 2);
+
     // Get Camera and Image Data
     mSizeofCameras = vpKFs.size();
     vpKFs[0]->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
     SetProjMatrix();
     mTrainedImages.resize(mSizeofCameras);
+    mTrainedImagesTensor.resize(mSizeofCameras);
     mViewMatrices.resize(mSizeofCameras);
     mProjMatrices.resize(mSizeofCameras);
     mCameraCenters.resize(mSizeofCameras);
@@ -55,6 +82,8 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
         torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
 
         mTrainedImages.push_back(pKF->mIm);
+        mTrainedImagesTensor.push_back(CVMatToTensor(pKF->mIm)); // 1.0 / 225.
+
         mViewMatrices.push_back(ViewMatrix);
         mProjMatrices.push_back(FullProjMatrix);
         mCameraCenters.push_back(CamCenter);
@@ -62,7 +91,117 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
 
     // Setup Optimizer
     TrainingSetup();
+    // Setup Loss Monitor
+    mLossMonitor = new GaussianSplatting::LossMonitor(200);
+}
 
+void GaussianOptimizer::Optimize()
+{
+    std::cout << "[GaussianOptimizer::Optimize] Start" << std::endl;
+
+    std::vector<int> CamIndices;
+    int CamIndex = 0;
+
+    for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
+        if (CamIndices.empty()) {
+            CamIndices = GetRandomIndices(mSizeofCameras);
+        }
+
+        CamIndex = CamIndices.back();
+        torch::Tensor ViewMatrix = GetViewMatrixWithIndex(CamIndex);
+        torch::Tensor ProjMatrix = GetProjMatrixWithIndex(CamIndex);
+        torch::Tensor CamCenter = GetCamCenterWithIndex(CamIndex);
+        torch::Tensor GTImg = GetGTImgTensor(CamIndex);
+        CamIndices.pop_back(); // remove last element to iterate over all cameras randomly
+
+        // Set up rasterization configuration
+        GaussianRasterizationSettings raster_settings = {
+            .image_height = static_cast<int>(mImHeight),
+            .image_width = static_cast<int>(mImWidth),
+            .tanfovx = mTanFovx,
+            .tanfovy = mTanFovy,
+            .bg = mBackground,
+            .scale_modifier = mScaleModifier,
+            .viewmatrix = ViewMatrix,
+            .projmatrix = ProjMatrix,
+            .sh_degree = mSHDegree,
+            .camera_center = CamCenter,
+            .prefiltered = mPrefiltered};
+
+        // Render
+        GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+        torch::cuda::synchronize();
+        // auto [rendererd_image, radii] = rasterizer.forward(
+        //     mMeans3D,
+        //     mMeans2D,
+        //     mOpacity,
+        //     mFeatures,
+        //     mColorsPrecomp,
+        //     mScales,
+        //     mRotation,
+        //     mCov3DPrecomp);
+
+        // Loss Computations
+        // auto l1l = gaussian_splatting::l1_loss(image, gt_image);
+        // auto ssim_loss = gaussian_splatting::ssim(image, gt_image, conv_window, window_size, channel);
+        // auto loss = (1.f - optimParams.lambda_dssim) * l1l + optimParams.lambda_dssim * (1.f - ssim_loss);
+    }
+}
+
+std::vector<int> GaussianOptimizer::GetRandomIndices(const int &max_index) 
+{
+    std::vector<int> indices(max_index);
+    std::iota(indices.begin(), indices.end(), 0);
+    // Shuffle the vector
+    std::shuffle(indices.begin(), indices.end(), std::default_random_engine());
+    std::reverse(indices.begin(), indices.end());
+    return indices;
+}
+
+torch::Tensor GaussianOptimizer::GetViewMatrixWithIndex(const int &CamIndex)
+{
+    return mViewMatrices[CamIndex];
+}
+
+torch::Tensor GaussianOptimizer::GetProjMatrixWithIndex(const int &CamIndex)
+{
+    return mProjMatrices[CamIndex];
+}
+
+torch::Tensor GaussianOptimizer::GetCamCenterWithIndex(const int &CamIndex)
+{
+    return mCameraCenters[CamIndex];
+}
+
+torch::Tensor GaussianOptimizer::GetGTImgTensor(const int &CamIndex)
+{
+    return mTrainedImagesTensor[CamIndex];
+}
+
+torch::Tensor GaussianOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) {
+        return torch::abs((network_output - gt)).mean();
+    }
+
+cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
+{
+    tensor = tensor.squeeze().detach().permute({1, 2, 0});
+    tensor = tensor.mul(255).clamp(0, 255).to(torch::kU8);
+    tensor = tensor.to(torch::kCPU);
+    int64_t height = tensor.size(0);
+    int64_t width = tensor.size(1);
+    cv::Mat mat = cv::Mat(height, width, CV_8UC3, tensor.data_ptr());
+    return mat.clone();
+}
+
+torch::Tensor GaussianOptimizer::CVMatToTensor(cv::Mat mat)
+{
+    cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+    cv::Mat matFloat;
+    mat.convertTo(matFloat, CV_32F, 1.0 / 255);
+    auto size = matFloat.size();
+    auto nChannels = matFloat.channels();
+    auto tensor = torch::from_blob(matFloat.data, {size.height, size.width, nChannels});
+    return tensor.permute({2, 0, 1});
 }
 
 void GaussianOptimizer::TrainingSetup()
@@ -75,23 +214,23 @@ void GaussianOptimizer::TrainingSetup()
                                                          mOptimParams.position_lr_delay_mult,
                                                          mOptimParams.position_lr_max_steps  );
 
-    // std::vector<torch::optim::OptimizerParamGroup> optimizer_params_groups;
-    // optimizer_params_groups.reserve(6);
-    // optimizer_params_groups.push_back(torch::optim::OptimizerParamGroup({_xyz}, std::make_unique<torch::optim::AdamOptions>(params.position_lr_init * this->_spatial_lr_scale)));
-    // optimizer_params_groups.push_back(torch::optim::OptimizerParamGroup({_features_dc}, std::make_unique<torch::optim::AdamOptions>(params.feature_lr)));
-    // optimizer_params_groups.push_back(torch::optim::OptimizerParamGroup({_features_rest}, std::make_unique<torch::optim::AdamOptions>(params.feature_lr / 20.)));
-    // optimizer_params_groups.push_back(torch::optim::OptimizerParamGroup({_scaling}, std::make_unique<torch::optim::AdamOptions>(params.scaling_lr * this->_spatial_lr_scale)));
-    // optimizer_params_groups.push_back(torch::optim::OptimizerParamGroup({_rotation}, std::make_unique<torch::optim::AdamOptions>(params.rotation_lr)));
-    // optimizer_params_groups.push_back(torch::optim::OptimizerParamGroup({_opacity}, std::make_unique<torch::optim::AdamOptions>(params.opacity_lr)));
+    std::vector<torch::optim::OptimizerParamGroup> OptimizerParamsGroups;
+    OptimizerParamsGroups.reserve(6);
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mMeans3D}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.position_lr_init * mSpatialLRScale)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mFeaturesDC}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.feature_lr)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mFeaturesRest}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.feature_lr / 20.)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mScales}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.scaling_lr * mSpatialLRScale)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mRotation}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.rotation_lr)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mOpacity}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.opacity_lr)));
 
-    // static_cast<torch::optim::AdamOptions&>(optimizer_params_groups[0].options()).eps(1e-15);
-    // static_cast<torch::optim::AdamOptions&>(optimizer_params_groups[1].options()).eps(1e-15);
-    // static_cast<torch::optim::AdamOptions&>(optimizer_params_groups[2].options()).eps(1e-15);
-    // static_cast<torch::optim::AdamOptions&>(optimizer_params_groups[3].options()).eps(1e-15);
-    // static_cast<torch::optim::AdamOptions&>(optimizer_params_groups[4].options()).eps(1e-15);
-    // static_cast<torch::optim::AdamOptions&>(optimizer_params_groups[5].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[0].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[1].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[2].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[3].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[4].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[5].options()).eps(1e-15);
 
-    // _optimizer = std::make_unique<torch::optim::Adam>(optimizer_params_groups, torch::optim::AdamOptions(0.f).eps(1e-15));
+    mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));
 }
 
 torch::Tensor GaussianOptimizer::GetViewMatrix(Sophus::SE3f &Tcw)

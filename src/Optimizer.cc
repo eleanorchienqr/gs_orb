@@ -5597,7 +5597,6 @@ void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, bool *pbS
     vector<MapGaussian*> vpMG = pMap->GetAllMapGaussians();
     // BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
     GaussianOptimization(vpKFs,vpMP,vpMG,nIterations,pbStopFlag, nLoopKF, bRobust);
-
 }
 
 void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, const vector<MapGaussian *> &vpMG, 
@@ -5606,8 +5605,7 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
     ORB_SLAM3::OptimizationParameters OptimParams;
     GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
     optimizer.InitializeOptimization(vpKFs, vpMG);
-    // optimizer.optimize(nIteration)
-
+    optimizer.Optimize();
 }
 
 } //namespace ORB_SLAM

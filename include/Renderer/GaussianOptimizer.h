@@ -1,4 +1,6 @@
 #include <torch/torch.h>
+#include <deque>
+
 #include "Config.h"
 #include "MapGaussian.h"
 #include "KeyFrame.h"
@@ -34,6 +36,21 @@ struct Expon_lr_func {
     }
 };
 
+
+class LossMonitor {
+
+public:
+    explicit LossMonitor(size_t size) : _buffer_size(size) {}
+    float Update(float newLoss);
+    bool IsConverging(float threshold);
+
+private:
+    std::deque<float> _loss_buffer;
+    std::deque<float> _rate_of_change_buffer;
+    size_t _buffer_size;
+};
+
+
 class GaussianOptimizer
 {
 public:
@@ -42,10 +59,24 @@ public:
 
     void InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapGaussian *> &vpMG);
     void TrainingSetup();
-    // Optimize(int nIteration);
+    void Optimize();
 
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
     void SetProjMatrix();
+
+    std::vector<int> GetRandomIndices(const int &max_index);
+    torch::Tensor GetViewMatrixWithIndex(const int &CamIndex);
+    torch::Tensor GetProjMatrixWithIndex(const int &CamIndex);
+    torch::Tensor GetCamCenterWithIndex(const int &CamIndex);
+    torch::Tensor GetGTImgTensor(const int &CamIndex);
+
+    // Converter
+    torch::Tensor CVMatToTensor(cv::Mat mat);
+    cv::Mat TensorToCVMat(torch::Tensor tensor);
+
+    // Loss functions
+    torch::Tensor L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt);
+
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
@@ -58,12 +89,15 @@ protected:
     torch::Tensor mRotation;
     torch::Tensor mMeans2D;
     torch::Tensor mFeatures;
+    torch::Tensor mFeaturesDC;
+    torch::Tensor mFeaturesRest;
     torch::Tensor mCov3DPrecomp = torch::Tensor();
     torch::Tensor mColorsPrecomp = torch::Tensor();
 
     // Cameras/KeyFrames associated members
     int mSizeofCameras;
     std::vector<cv::Mat> mTrainedImages;
+    std::vector<torch::Tensor> mTrainedImagesTensor;
     std::vector<torch::Tensor> mViewMatrices;
     std::vector<torch::Tensor> mProjMatrices;
     std::vector<torch::Tensor> mCameraCenters;
@@ -87,7 +121,10 @@ protected:
     torch::Tensor mPosGradientAccum;
     torch::Tensor mDenom;
     Expon_lr_func mPosSchedulerArgs;
-    torch::optim::Adam* mOptimizer;
+    std::unique_ptr<torch::optim::Adam> mOptimizer;
+
+    // Loss Monitor
+    LossMonitor* mLossMonitor;
 };
 
 }
