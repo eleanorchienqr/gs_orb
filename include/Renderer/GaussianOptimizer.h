@@ -62,7 +62,7 @@ public:
     void Optimize();
 
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
-    void SetProjMatrix();
+    torch::Tensor SetProjMatrix();
 
     std::vector<int> GetRandomIndices(const int &max_index);
     torch::Tensor GetViewMatrixWithIndex(const int &CamIndex);
@@ -75,7 +75,10 @@ public:
     cv::Mat TensorToCVMat(torch::Tensor tensor);
 
     // Loss functions
+    torch::Tensor CreateWindow();
     torch::Tensor L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt);
+    torch::Tensor SSIM(const torch::Tensor& img1, const torch::Tensor& img2);
+    torch::Tensor GaussianKernel1D(int window_size, float sigma);
 
 
 protected:
@@ -108,7 +111,7 @@ protected:
     float mTanFovy;
     torch::Tensor mProjMatrix;
     
-    torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f});
+    torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);
     float mScaleModifier = 1.f;
     int mSHDegree = 10;
     bool mPrefiltered = false;
@@ -122,9 +125,15 @@ protected:
     torch::Tensor mDenom;
     Expon_lr_func mPosSchedulerArgs;
     std::unique_ptr<torch::optim::Adam> mOptimizer;
+    // torch::Device mDevice;
 
-    // Loss Monitor
+    // Loss related members
     LossMonitor* mLossMonitor;
+    torch::Tensor mSSIMWindow;
+    int mWindowSize = 11;
+    int mChannel = 3;
+    const float mC1 = 0.01 * 0.01;
+    const float mC2 = 0.03 * 0.03;
 };
 
 }

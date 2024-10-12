@@ -145,7 +145,6 @@ public:
         auto sh_degree_copy = ctx->saved_data["sh_degree"].to<int>();
         auto camera_center_copy = ctx->saved_data["camera_center"].to<torch::Tensor>();
 #endif
-
         auto [grad_means2D, grad_colors_precomp, grad_opacities, grad_means3D, grad_cov3Ds_precomp, grad_sh, grad_scales, grad_rotations] = RasterizeGaussiansBackwardCUDA(
             ctx->saved_data["background"].to<torch::Tensor>(),
             means3D,

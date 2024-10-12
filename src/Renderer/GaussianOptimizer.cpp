@@ -35,16 +35,16 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
 {
 
     std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussians in Map: " << vpMG.size() << std::endl;
-
+    
     // Get Gaussian Data
     mSizeofGaussians = vpMG.size();
-    mMeans3D = torch::zeros({mSizeofGaussians, 3});
-    mOpacity = torch::zeros({mSizeofGaussians, 1});
-    mScales = torch::zeros({mSizeofGaussians, 3});
-    mRotation = torch::zeros({mSizeofGaussians, 4});
-    mMeans2D = torch::zeros({mSizeofGaussians, 2});
-    mFeatures = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))});
+    mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mOpacity = torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mMeans2D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
 
+    torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     for(size_t i=0; i<vpMG.size(); i++)
     {
         ORB_SLAM3::MapGaussian* pMG = vpMG[i];
@@ -54,22 +54,32 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
             mOpacity.index_put_({(int)i, "..."},  pMG->GetOpacity());
             mScales.index_put_({(int)i, "..."},   pMG->GetScale());
             mRotation.index_put_({(int)i, "..."}, pMG->GetRotation());
-            mFeatures.index_put_({(int)i, "..."}, pMG->GetFeature());
+            Features.index_put_({(int)i, "..."}, pMG->GetFeature());
         }
     }
 
-    mFeaturesDC = mFeatures.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 1)}).transpose(1, 2);
-    mFeaturesRest = mFeatures.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None)}).transpose(1, 2);
+    mFeaturesDC = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 1)}).transpose(1, 2).contiguous().to(torch::kCUDA);
+    mFeaturesRest = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None)}).transpose(1, 2).contiguous().to(torch::kCUDA);
+    mFeatures = torch::cat({mFeaturesDC, mFeaturesRest}, 1).to(torch::kCUDA);
 
+    mMeans3D.set_requires_grad(true);
+    mMeans2D.set_requires_grad(true);
+    mOpacity.set_requires_grad(true);
+    mScales.set_requires_grad(true);
+    mRotation.set_requires_grad(true);
+    mFeatures.set_requires_grad(true);
+
+    
     // Get Camera and Image Data
     mSizeofCameras = vpKFs.size();
     vpKFs[0]->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
-    SetProjMatrix();
-    mTrainedImages.resize(mSizeofCameras);
-    mTrainedImagesTensor.resize(mSizeofCameras);
-    mViewMatrices.resize(mSizeofCameras);
-    mProjMatrices.resize(mSizeofCameras);
-    mCameraCenters.resize(mSizeofCameras);
+    mProjMatrix = SetProjMatrix();
+    std::cout << "[GaussianSplatting::Optimize] mSizeofCameras: " << mSizeofCameras << std::endl;
+
+    std::cout << "[GaussianSplatting::Optimize] mImHeight: " << mImHeight << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mImWidth: " << mImWidth << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mTanFovx: " << mTanFovx << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mTanFovy: " << mTanFovy << std::endl;
 
     for(size_t i=0; i<vpKFs.size(); i++)
     {
@@ -82,17 +92,22 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
         torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
 
         mTrainedImages.push_back(pKF->mIm);
-        mTrainedImagesTensor.push_back(CVMatToTensor(pKF->mIm)); // 1.0 / 225.
+        torch::Tensor TrainedImageTensor = CVMatToTensor(pKF->mIm);
+        mTrainedImagesTensor.push_back(TrainedImageTensor.to(torch::kCUDA)); // 1.0 / 225.
 
-        mViewMatrices.push_back(ViewMatrix);
-        mProjMatrices.push_back(FullProjMatrix);
-        mCameraCenters.push_back(CamCenter);
+        mViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
+        mProjMatrices.push_back(FullProjMatrix.to(torch::kCUDA));
+        mCameraCenters.push_back(CamCenter.to(torch::kCUDA));
+
+        std::cout << "[GaussianSplatting::Optimize] ViewMatrix: " << i << ", " << mViewMatrices[i] << std::endl;
+        std::cout << "[GaussianSplatting::Optimize] ProjMatrix: " << i << ", " << mProjMatrices[i] << std::endl;
     }
 
     // Setup Optimizer
     TrainingSetup();
     // Setup Loss Monitor
     mLossMonitor = new GaussianSplatting::LossMonitor(200);
+    mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
 }
 
 void GaussianOptimizer::Optimize()
@@ -131,20 +146,22 @@ void GaussianOptimizer::Optimize()
         // Render
         GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
         torch::cuda::synchronize();
-        // auto [rendererd_image, radii] = rasterizer.forward(
-        //     mMeans3D,
-        //     mMeans2D,
-        //     mOpacity,
-        //     mFeatures,
-        //     mColorsPrecomp,
-        //     mScales,
-        //     mRotation,
-        //     mCov3DPrecomp);
+        auto [rendererd_image, radii] = rasterizer.forward(
+            mMeans3D,
+            mMeans2D,
+            mOpacity,
+            mFeatures,
+            mColorsPrecomp,
+            mScales,
+            mRotation,
+            mCov3DPrecomp);
 
         // Loss Computations
-        // auto l1l = gaussian_splatting::l1_loss(image, gt_image);
-        // auto ssim_loss = gaussian_splatting::ssim(image, gt_image, conv_window, window_size, channel);
-        // auto loss = (1.f - optimParams.lambda_dssim) * l1l + optimParams.lambda_dssim * (1.f - ssim_loss);
+        auto L1loss =L1Loss(GTImg, rendererd_image);
+        auto SSIMloss = SSIM(rendererd_image, GTImg);
+        auto loss = (1.f - mOptimParams.lambda_dssim) * L1loss + mOptimParams.lambda_dssim * (1.f - SSIMloss);
+        loss.backward();
+        // std::cout << "[GaussianSplatting::Optimize] Loss: " << loss << std::endl;
     }
 }
 
@@ -181,6 +198,22 @@ torch::Tensor GaussianOptimizer::GetGTImgTensor(const int &CamIndex)
 torch::Tensor GaussianOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) {
         return torch::abs((network_output - gt)).mean();
     }
+
+torch::Tensor GaussianOptimizer::SSIM(const torch::Tensor& img1, const torch::Tensor& img2) {
+auto mu1 = torch::nn::functional::conv2d(img1, mSSIMWindow, torch::nn::functional::Conv2dFuncOptions().padding(mWindowSize / 2).groups(mChannel));
+    auto mu1_sq = mu1.pow(2);
+    auto sigma1_sq = torch::nn::functional::conv2d(img1 * img1, mSSIMWindow, torch::nn::functional::Conv2dFuncOptions().padding(mWindowSize / 2).groups(mChannel)) - mu1_sq;
+
+    auto mu2 = torch::nn::functional::conv2d(img2, mSSIMWindow, torch::nn::functional::Conv2dFuncOptions().padding(mWindowSize / 2).groups(mChannel));
+    auto mu2_sq = mu2.pow(2);
+    auto sigma2_sq = torch::nn::functional::conv2d(img2 * img2, mSSIMWindow, torch::nn::functional::Conv2dFuncOptions().padding(mWindowSize / 2).groups(mChannel)) - mu2_sq;
+
+    auto mu1_mu2 = mu1 * mu2;
+    auto sigma12 = torch::nn::functional::conv2d(img1 * img2, mSSIMWindow, torch::nn::functional::Conv2dFuncOptions().padding(mWindowSize / 2).groups(mChannel)) - mu1_mu2;
+    auto ssim_map = ((2.f * mu1_mu2 + mC1) * (2.f * sigma12 + mC2)) / ((mu1_sq + mu2_sq + mC1) * (sigma1_sq + sigma2_sq + mC2));
+
+    return ssim_map.mean();
+}
 
 cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
 {
@@ -251,7 +284,7 @@ torch::Tensor GaussianOptimizer::GetViewMatrix(Sophus::SE3f &Tcw)
     return W2CTensor.clone();
 }
 
-void GaussianOptimizer::SetProjMatrix()
+torch::Tensor GaussianOptimizer::SetProjMatrix()
 {
     float top = mTanFovy * mNear;
     float bottom = -top;
@@ -271,8 +304,23 @@ void GaussianOptimizer::SetProjMatrix()
     P(2, 3) = -(mFar * mNear) / (mFar - mNear);
 
     // create torch::Tensor from Eigen::Matrix
-    mProjMatrix = torch::from_blob(P.data(), {4, 4}, torch::kFloat);
+    torch::Tensor ProjMatrix = torch::from_blob(P.data(), {4, 4}, torch::kFloat);
+    return ProjMatrix.clone();
 }
 
+torch::Tensor GaussianOptimizer::GaussianKernel1D(int window_size, float sigma) {
+        torch::Tensor gauss = torch::empty(window_size);
+        for (int x = 0; x < window_size; ++x) {
+            gauss[x] = std::exp(-(std::pow(std::floor(static_cast<float>(x - window_size) / 2.f), 2)) / (2.f * sigma * sigma));
+        }
+        return gauss / gauss.sum();
+    }
+
+torch::Tensor GaussianOptimizer::CreateWindow()
+    {
+    auto _1D_window = GaussianKernel1D(mWindowSize, 1.5).unsqueeze(1);
+    auto _2D_window = _1D_window.mm(_1D_window.t()).unsqueeze(0).unsqueeze(0);
+    return _2D_window.expand({mChannel, 1, mWindowSize, mWindowSize}).contiguous();
+}
 
 }
