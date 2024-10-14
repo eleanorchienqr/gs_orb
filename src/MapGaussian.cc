@@ -38,8 +38,6 @@ MapGaussian::MapGaussian(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap
     mpReplaced(static_cast<MapGaussian*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap),
     mnOriginMapId(pMap->GetId())
 {
-    // std::cout << "-------------Create single MapGaussian------------" << std::endl;
-
     const int FeaturestDim = std::pow(mSHDegree + 1, 2) - 1;
     const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
@@ -47,7 +45,7 @@ MapGaussian::MapGaussian(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap
     mWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA);
     mWorldRot = torch::zeros({1, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
     mOpacity = inverse_sigmoid(0.5 * torch::ones({1, 1})).to(torch::kCUDA, true);
-    mFeatureDC = torch::ones({1, 3}).to(torch::kCUDA, true);
+    mFeatureDC = RGB2SH(torch::zeros({1, 3})).to(torch::kCUDA, true);
     mFeaturest = torch::zeros({1, FeaturestDim}).to(torch::kCUDA, true);
 
     // std::cout << "WorldPos of MapPoint: " << PosTranspose << std::endl;

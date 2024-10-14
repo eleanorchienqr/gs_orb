@@ -66,6 +66,11 @@ class MapGaussian
             return torch::log(x / (1 - x));
         }
 
+        inline torch::Tensor RGB2SH(const torch::Tensor& rgb) {
+            const double C0 = 0.28209479177387814;
+            return (rgb - 0.5f) / static_cast<float>(C0);
+        }
+
         
         //Setters
         void SetWorldPos(const Eigen::Vector3f &Pos);
@@ -179,7 +184,7 @@ class MapGaussian
         // long unsigned int mSHDegree = 10;
         // Eigen::Vector3f mFeatureDC;
         // Eigen::MatrixXf mFeaturest;
-        long unsigned int mSHDegree = 10;
+        long unsigned int mSHDegree = 3;
 
         torch::Tensor mWorldPos;            // {1, 3}
         torch::Tensor mWorldRot;            // {1, 4}

@@ -61,6 +61,7 @@ public:
     void TrainingSetup();
     void Optimize();
 
+    // Getter
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
     torch::Tensor SetProjMatrix();
 
@@ -80,6 +81,11 @@ public:
     torch::Tensor SSIM(const torch::Tensor& img1, const torch::Tensor& img2);
     torch::Tensor GaussianKernel1D(int window_size, float sigma);
 
+    // Densification and prune
+    void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
+
+    // Learning rate updater
+    void UpdateLR(float iteration);
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
@@ -113,7 +119,7 @@ protected:
     
     torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);
     float mScaleModifier = 1.f;
-    int mSHDegree = 10;
+    int mSHDegree = 3;
     bool mPrefiltered = false;
     float mNear = 0.01f;
     float mFar = 100.0f;

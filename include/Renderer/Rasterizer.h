@@ -200,6 +200,7 @@ public:
                          imgBuffer_copy);
 #endif
         // return gradients for all inputs, 19 in total. :D
+        // std::cout << "[GaussianSplatting::Optimize] grad_means2D: " << grad_means2D << std::endl;
         return {grad_means3D,
                 grad_means2D,
                 grad_sh,

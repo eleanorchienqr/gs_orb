@@ -1,6 +1,8 @@
 #include "GaussianOptimizer.h"
 #include "Renderer/Rasterizer.h"
 
+#include <c10/cuda/CUDACachingAllocator.h>
+
 namespace GaussianSplatting{
 
 float LossMonitor::Update(float newLoss) {
@@ -69,13 +71,14 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     mRotation.set_requires_grad(true);
     mFeatures.set_requires_grad(true);
 
+    std::cout << "[GaussianSplatting::Optimize] mFeatures: " << mFeatures << std::endl;
     
     // Get Camera and Image Data
     mSizeofCameras = vpKFs.size();
     vpKFs[0]->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
     mProjMatrix = SetProjMatrix();
-    std::cout << "[GaussianSplatting::Optimize] mSizeofCameras: " << mSizeofCameras << std::endl;
 
+    std::cout << "[GaussianSplatting::Optimize] mSizeofCameras: " << mSizeofCameras << std::endl;
     std::cout << "[GaussianSplatting::Optimize] mImHeight: " << mImHeight << std::endl;
     std::cout << "[GaussianSplatting::Optimize] mImWidth: " << mImWidth << std::endl;
     std::cout << "[GaussianSplatting::Optimize] mTanFovx: " << mTanFovx << std::endl;
@@ -161,8 +164,51 @@ void GaussianOptimizer::Optimize()
         auto SSIMloss = SSIM(rendererd_image, GTImg);
         auto loss = (1.f - mOptimParams.lambda_dssim) * L1loss + mOptimParams.lambda_dssim * (1.f - SSIMloss);
         loss.backward();
-        // std::cout << "[GaussianSplatting::Optimize] Loss: " << loss << std::endl;
+        std::cout << "[GaussianSplatting::Optimize] Loss: " << loss << std::endl;
+
+        { 
+            torch::NoGradGuard no_grad;
+
+            // Densification
+            if (iter < mOptimParams.densify_until_iter) {
+                torch::Tensor VisibilityFilter = radii > 0;
+                // std::cout << "[GaussianSplatting::Optimize] mMeans3D.grad(): " << mMeans3D.grad() << std::endl;
+                // AddDensificationStats(mMeans2D, VisibilityFilter);
+                if (iter > mOptimParams.densify_from_iter && iter % mOptimParams.densification_interval == 0) {
+                    float size_threshold = iter > mOptimParams.opacity_reset_interval ? 20.f : -1.f;
+                    // DensifyAndPrune(mOptimParams.densify_grad_threshold, mOptimParams.min_opacity, scene.Get_cameras_extent(), size_threshold);
+                }
+
+                // if (iter % mOptimParams.opacity_reset_interval == 0 || (modelParams.white_background && iter == optimParams.densify_from_iter)) {
+                //     gaussians.Reset_opacity();
+                // }
+            }
+
+            //  Optimizer step
+            if (iter < mOptimParams.iterations) {
+                mOptimizer->step();
+                mOptimizer->zero_grad(true);
+                UpdateLR(iter);
+            }
+
+            // Clear cache
+            // if (mOptimParams.empty_gpu_cache && iter % 100) {
+            //     c10::cuda::CUDACachingAllocator::emptyCache();
+            // }
+        }
     }
+}
+
+void GaussianOptimizer::AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter) {
+    mPosGradientAccum.index_put_({update_filter}, mPosGradientAccum.index_select(0, update_filter.nonzero().squeeze()) + viewspace_point_tensor.grad().index_select(0, update_filter.nonzero().squeeze()).slice(1, 0, 2).norm(2, -1, true));
+    mDenom.index_put_({update_filter}, mDenom.index_select(0, update_filter.nonzero().squeeze()) + 1);
+}
+
+void GaussianOptimizer::UpdateLR(float iteration) {
+    // This is hacky because you cant change in libtorch individual parameter learning rate
+    // xyz is added first, since _optimizer->param_groups() return a vector, we assume that xyz stays first
+    auto lr = mPosSchedulerArgs(iteration);
+    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[0].options()).set_lr(lr);
 }
 
 std::vector<int> GaussianOptimizer::GetRandomIndices(const int &max_index) 
