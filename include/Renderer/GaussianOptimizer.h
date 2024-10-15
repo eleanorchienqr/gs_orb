@@ -61,6 +61,11 @@ public:
     void TrainingSetup();
     void Optimize();
 
+
+    // Camera params
+    std::pair<torch::Tensor, float> GetNerfppNorm();
+    std::pair<torch::Tensor, float> GetCenterAndDiag();
+
     // Getter
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
     torch::Tensor SetProjMatrix();
@@ -83,6 +88,14 @@ public:
 
     // Densification and prune
     void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
+    void DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size);
+    void DensifyAndClone(torch::Tensor& grads, float grad_threshold);
+    void DensifyAndSplit(torch::Tensor& grads, float grad_threshold, float min_opacity, float max_screen_size);
+
+    void DensificationPostfix(torch::Tensor& newMeans3D, torch::Tensor& newFeaturesDC, torch::Tensor& newFeaturesRest,
+                              torch::Tensor& newScales, torch::Tensor& newRotation, torch::Tensor& newOpacity);
+    void CatTensorstoOptimizer(torch::optim::Adam* optimizer, torch::Tensor& extension_tensor,
+                               torch::Tensor& old_tensor, int param_position);
 
     // Learning rate updater
     void UpdateLR(float iteration);
@@ -124,6 +137,10 @@ protected:
     float mNear = 0.01f;
     float mFar = 100.0f;
 
+    // Cameras associated members
+    float mNerfNormRadius;
+    torch::Tensor mNerfNormTranslation;
+
     // Training associated members
     float mSpatialLRScale = 6.0;
     float mPercentDense;
@@ -140,6 +157,9 @@ protected:
     int mChannel = 3;
     const float mC1 = 0.01 * 0.01;
     const float mC2 = 0.03 * 0.03;
+
+    // For densification
+    
 };
 
 }

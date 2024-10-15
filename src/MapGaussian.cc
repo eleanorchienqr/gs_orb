@@ -107,18 +107,21 @@ torch::Tensor MapGaussian::GetWorldPos()
 torch::Tensor MapGaussian::GetOpacity()
 {
     unique_lock<mutex> lock(mMutexPos);
+    // return torch::sigmoid(mOpacity);
     return mOpacity;
 }
 
 torch::Tensor MapGaussian::GetScale()
 {
     unique_lock<mutex> lock(mMutexPos);
+    // return torch::exp(mScale);
     return mScale;
 }
 
 torch::Tensor MapGaussian::GetRotation()
 {
     unique_lock<mutex> lock(mMutexPos);
+    // return torch::nn::functional::normalize(mWorldRot);
     return mWorldRot;
 }
 
