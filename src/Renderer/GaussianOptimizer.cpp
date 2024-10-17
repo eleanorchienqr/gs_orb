@@ -172,7 +172,7 @@ void GaussianOptimizer::Optimize()
         auto SSIMloss = SSIM(rendererd_image, GTImg);
         auto loss = (1.f - mOptimParams.lambda_dssim) * L1loss + mOptimParams.lambda_dssim * (1.f - SSIMloss);
         loss.backward();
-        // std::cout << "[GaussianSplatting::Optimize] Loss: " << loss << std::endl;
+        std::cout << "[GaussianSplatting::Optimize] Loss: " << loss << std::endl;
 
         { 
             torch::NoGradGuard no_grad;
@@ -185,9 +185,9 @@ void GaussianOptimizer::Optimize()
                     DensifyAndPrune(mOptimParams.densify_grad_threshold, mOptimParams.min_opacity, size_threshold);
                 }
 
-                // if (iter % mOptimParams.opacity_reset_interval == 0 || (modelParams.white_background && iter == optimParams.densify_from_iter)) {
-                //     gaussians.Reset_opacity();
-                // }
+                if (iter % mOptimParams.opacity_reset_interval == 0 || (mWhiteBackground && iter == mOptimParams.densify_from_iter)) {
+                    ResetOpacity();
+                }
             }
 
             //  Optimizer step
@@ -220,7 +220,7 @@ void GaussianOptimizer::DensifyAndClone(torch::Tensor& grads, float grad_thresho
                                                    torch::ones_like(grads.index({torch::indexing::Slice()})).to(torch::kBool),
                                                    torch::zeros_like(grads.index({torch::indexing::Slice()})).to(torch::kBool))
                                                    .to(torch::kLong);
-    selected_pts_mask = torch::logical_and(selected_pts_mask, std::get<0>(mScales.max(1)).unsqueeze(-1) <= mPercentDense * mNerfNormRadius);
+    selected_pts_mask = torch::logical_and(selected_pts_mask, std::get<0>(torch::exp(mScales).max(1)).unsqueeze(-1) <= mPercentDense * mNerfNormRadius);
 
     auto indices = torch::nonzero(selected_pts_mask.squeeze(-1) == true).index({torch::indexing::Slice(torch::indexing::None, torch::indexing::None), torch::indexing::Slice(torch::indexing::None, 1)}).squeeze(-1);
     
@@ -231,7 +231,7 @@ void GaussianOptimizer::DensifyAndClone(torch::Tensor& grads, float grad_thresho
     torch::Tensor newScales = mScales.index_select(0, indices);
     torch::Tensor newRotation = mRotation.index_select(0, indices);
 
-    std::cout << "[GaussianSplatting::Densification] Size: " << indices << std::endl;
+    // std::cout << "[GaussianSplatting::Densification Clone] indices: " << indices << std::endl;
 
     DensificationPostfix(newMeans3D, newFeaturesDC, newFeaturesRest, newScales, newRotation, newOpacity);
 }
@@ -272,14 +272,91 @@ void GaussianOptimizer::CatTensorstoOptimizer(torch::Tensor& extension_tensor, t
     mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
 }
 
+void GaussianOptimizer::PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position)
+{
+    auto adamParamStates = std::make_unique<torch::optim::AdamParamState>(static_cast<torch::optim::AdamParamState&>(
+        *mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] ));
+    mOptimizer->state().erase(mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl());
+
+    adamParamStates->exp_avg(adamParamStates->exp_avg().index_select(0, mask));
+    adamParamStates->exp_avg_sq(adamParamStates->exp_avg_sq().index_select(0, mask));
+
+    mOptimizer->param_groups()[param_position].params()[0] = old_tensor.index_select(0, mask).set_requires_grad(true);
+    old_tensor = mOptimizer->param_groups()[param_position].params()[0]; // update old tensor
+    mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
+}
+
+void GaussianOptimizer::ResetOpacity()
+{
+    auto new_opacity = InverseSigmoid(torch::ones_like(mOpacity, torch::TensorOptions().dtype(torch::kFloat32)) * 0.01f);
+
+    auto adamParamStates = std::make_unique<torch::optim::AdamParamState>(static_cast<torch::optim::AdamParamState&>(
+        *mOptimizer->state()[mOptimizer->param_groups()[5].params()[0].unsafeGetTensorImpl()]));
+
+    mOptimizer->state().erase(mOptimizer->param_groups()[5].params()[0].unsafeGetTensorImpl());
+
+    adamParamStates->exp_avg(torch::zeros_like(new_opacity));
+    adamParamStates->exp_avg_sq(torch::zeros_like(new_opacity));
+    // replace tensor
+    mOptimizer->param_groups()[5].params()[0] = new_opacity.set_requires_grad(true);
+    mOpacity = mOptimizer->param_groups()[5].params()[0];
+
+    mOptimizer->state()[mOptimizer->param_groups()[5].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
+
+}
+
 void GaussianOptimizer::DensifyAndSplit(torch::Tensor& grads, float grad_threshold, float min_opacity, float max_screen_size)
 {
-    // static const int N = 2;
-    // const int n_init_points = mMeans3D.size(0);
-    // // Extract points that satisfy the gradient condition
-    // torch::Tensor padded_grad = torch::zeros({n_init_points}).to(torch::kCUDA);
-    // padded_grad.slice(0, 0, grads.size(0)) = grads.squeeze();
+    static const int N = 2;
+    const int n_init_points = mMeans3D.size(0);
+    // Extract points that satisfy the gradient condition
+    torch::Tensor padded_grad = torch::zeros({n_init_points}).to(torch::kCUDA);
+    padded_grad.slice(0, 0, grads.size(0)) = grads.squeeze();
+    torch::Tensor selected_pts_mask = torch::where(padded_grad >= grad_threshold, torch::ones_like(padded_grad).to(torch::kBool), torch::zeros_like(padded_grad).to(torch::kBool));
 
+    selected_pts_mask = torch::logical_and(selected_pts_mask, std::get<0>(torch::exp(mScales).max(1)) > mPercentDense * mNerfNormRadius);
+    auto indices = torch::nonzero(selected_pts_mask.squeeze(-1) == true).index({torch::indexing::Slice(torch::indexing::None, torch::indexing::None), torch::indexing::Slice(torch::indexing::None, 1)}).squeeze(-1);
+
+    torch::Tensor stds = torch::exp(mScales).index_select(0, indices).repeat({N, 1});
+    torch::Tensor means = torch::zeros({stds.size(0), 3}).to(torch::kCUDA);
+    torch::Tensor samples = torch::randn({stds.size(0), stds.size(1)}).to(torch::kCUDA) * stds + means;
+    torch::Tensor rots = RotQuaToMatrix(mRotation.index_select(0, indices)).repeat({N, 1, 1});
+
+    torch::Tensor newMeans3D = torch::bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + mMeans3D.index_select(0, indices).repeat({N, 1});
+    torch::Tensor newScales = torch::log(torch::exp(mScales).index_select(0, indices).repeat({N, 1}) / (0.8 * N));
+    torch::Tensor newRotation = mRotation.index_select(0, indices).repeat({N, 1});
+    torch::Tensor newFeaturesDC = mFeaturesDC.index_select(0, indices).repeat({N, 1, 1});
+    torch::Tensor newFeaturesRest = mFeaturesRest.index_select(0, indices).repeat({N, 1, 1});
+    torch::Tensor newOpacity = mOpacity.index_select(0, indices).repeat({N, 1});
+
+    // std::cout << "[GaussianSplatting::Densification Split] indices: " << indices << std::endl;
+
+    DensificationPostfix(newMeans3D, newFeaturesDC, newFeaturesRest, newScales, newRotation, newOpacity);
+
+    torch::Tensor prune_filter = torch::cat({selected_pts_mask.squeeze(-1), torch::zeros({N * selected_pts_mask.sum().item<int>()}).to(torch::kBool).to(torch::kCUDA)});
+    prune_filter = torch::logical_or(prune_filter, (torch::sigmoid(mOpacity) < min_opacity).squeeze(-1));
+    PrunePoints(prune_filter);
+
+}
+
+void GaussianOptimizer::PrunePoints(torch::Tensor mask)
+{
+    // reverse to keep points
+    auto valid_point_mask = ~mask;
+    int true_count = valid_point_mask.sum().item<int>();
+    auto indices = torch::nonzero(valid_point_mask == true).index({torch::indexing::Slice(torch::indexing::None, torch::indexing::None), torch::indexing::Slice(torch::indexing::None, 1)}).squeeze(-1);
+    PruneOptimizer(mMeans3D, indices, 0);
+    PruneOptimizer(mFeaturesDC, indices, 1);
+    PruneOptimizer(mFeaturesRest, indices, 2);
+    PruneOptimizer(mScales, indices, 3);
+    PruneOptimizer(mRotation, indices, 4);
+    PruneOptimizer(mOpacity, indices, 5);
+
+    // std::cout << "[GaussianSplatting::Densification Prune] indices: " << indices << std::endl;
+
+    mPosGradientAccum = mPosGradientAccum.index_select(0, indices);
+    mDenom = mDenom.index_select(0, indices);
+    // _max_radii2D = _max_radii2D.index_select(0, indices);
 }
 
 void GaussianOptimizer::AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter) {
@@ -459,6 +536,35 @@ torch::Tensor GaussianOptimizer::SetProjMatrix()
     torch::Tensor ProjMatrix = torch::from_blob(P.data(), {4, 4}, torch::kFloat);
     return ProjMatrix.clone();
 }
+
+    /**
+    * @brief Builds a rotation matrix from a tensor of quaternions.
+    *
+    * @param r Tensor of quaternions with shape (N, 4).
+    * @return Tensor of rotation matrices with shape (N, 3, 3).
+    */
+    torch::Tensor GaussianOptimizer::RotQuaToMatrix(torch::Tensor r) {
+        torch::Tensor norm = torch::sqrt(torch::sum(r.pow(2), 1));
+        torch::Tensor q = r / norm.unsqueeze(-1);
+
+        using Slice = torch::indexing::Slice;
+        torch::Tensor R = torch::zeros({q.size(0), 3, 3}, torch::device(torch::kCUDA));
+        torch::Tensor r0 = q.index({Slice(), 0});
+        torch::Tensor x = q.index({Slice(), 1});
+        torch::Tensor y = q.index({Slice(), 2});
+        torch::Tensor z = q.index({Slice(), 3});
+
+        R.index_put_({Slice(), 0, 0}, 1 - 2 * (y * y + z * z));
+        R.index_put_({Slice(), 0, 1}, 2 * (x * y - r0 * z));
+        R.index_put_({Slice(), 0, 2}, 2 * (x * z + r0 * y));
+        R.index_put_({Slice(), 1, 0}, 2 * (x * y + r0 * z));
+        R.index_put_({Slice(), 1, 1}, 1 - 2 * (x * x + z * z));
+        R.index_put_({Slice(), 1, 2}, 2 * (y * z - r0 * x));
+        R.index_put_({Slice(), 2, 0}, 2 * (x * z - r0 * y));
+        R.index_put_({Slice(), 2, 1}, 2 * (y * z + r0 * x));
+        R.index_put_({Slice(), 2, 2}, 1 - 2 * (x * x + y * y));
+        return R;
+    }
 
 torch::Tensor GaussianOptimizer::GaussianKernel1D(int window_size, float sigma) {
         torch::Tensor gauss = torch::empty(window_size);

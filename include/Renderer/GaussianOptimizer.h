@@ -79,6 +79,7 @@ public:
     // Converter
     torch::Tensor CVMatToTensor(cv::Mat mat);
     cv::Mat TensorToCVMat(torch::Tensor tensor);
+    torch::Tensor RotQuaToMatrix(torch::Tensor r);
 
     // Loss functions
     torch::Tensor CreateWindow();
@@ -91,13 +92,19 @@ public:
     void DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size);
     void DensifyAndClone(torch::Tensor& grads, float grad_threshold);
     void DensifyAndSplit(torch::Tensor& grads, float grad_threshold, float min_opacity, float max_screen_size);
+    void PrunePoints(torch::Tensor mask);
 
     void DensificationPostfix(torch::Tensor& newMeans3D, torch::Tensor& newFeaturesDC, torch::Tensor& newFeaturesRest,
                               torch::Tensor& newScales, torch::Tensor& newRotation, torch::Tensor& newOpacity);
     void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
-
+    void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
+    void ResetOpacity();
+    
     // Learning rate updater
     void UpdateLR(float iteration);
+
+    //utils
+    inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
@@ -131,6 +138,7 @@ protected:
     torch::Tensor mProjMatrix;
     
     torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);
+    bool mWhiteBackground = true;
     float mScaleModifier = 1.f;
     int mSHDegree = 3;
     bool mPrefiltered = false;
