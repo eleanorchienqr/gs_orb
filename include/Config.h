@@ -64,11 +64,11 @@ private:
 
 struct OptimizationParameters 
 {
-    size_t iterations = 400; // 30'000
+    size_t iterations = 3000; // 30'000
     float position_lr_init = 0.00016f;
     float position_lr_final = 0.0000016f;
     float position_lr_delay_mult = 0.01f;
-    int64_t position_lr_max_steps = 400; // 30'000
+    int64_t position_lr_max_steps = 3000; // 30'000
     float feature_lr = 0.0025f;
     float percent_dense = 0.01f;
     float opacity_lr = 0.05f;
@@ -78,8 +78,8 @@ struct OptimizationParameters
     float min_opacity = 0.005f;
     uint64_t densification_interval = 100;
     uint64_t opacity_reset_interval = 200; // 3'000
-    uint64_t densify_from_iter = 60; // 500
-    uint64_t densify_until_iter = 200; // 15'000
+    uint64_t densify_from_iter = 50; // 500
+    uint64_t densify_until_iter = 1500; // 15'000
     float densify_grad_threshold = 0.0002f;
     bool early_stopping = false;
     float convergence_threshold = 0.007f;

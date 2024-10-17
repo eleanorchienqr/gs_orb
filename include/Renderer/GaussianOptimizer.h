@@ -94,8 +94,7 @@ public:
 
     void DensificationPostfix(torch::Tensor& newMeans3D, torch::Tensor& newFeaturesDC, torch::Tensor& newFeaturesRest,
                               torch::Tensor& newScales, torch::Tensor& newRotation, torch::Tensor& newOpacity);
-    void CatTensorstoOptimizer(torch::optim::Adam* optimizer, torch::Tensor& extension_tensor,
-                               torch::Tensor& old_tensor, int param_position);
+    void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
 
     // Learning rate updater
     void UpdateLR(float iteration);
@@ -109,12 +108,13 @@ protected:
     torch::Tensor mOpacity;
     torch::Tensor mScales;
     torch::Tensor mRotation;
-    torch::Tensor mMeans2D;
-    torch::Tensor mFeatures;
+    
     torch::Tensor mFeaturesDC;
     torch::Tensor mFeaturesRest;
-    torch::Tensor mCov3DPrecomp = torch::Tensor();
-    torch::Tensor mColorsPrecomp = torch::Tensor();
+    // torch::Tensor mMeans2D;                          // reset every iter
+    // torch::Tensor mFeatures;                         // reset every iter
+    // torch::Tensor mCov3DPrecomp = torch::Tensor();   // reset every iter
+    // torch::Tensor mColorsPrecomp = torch::Tensor();  // reset every iter
 
     // Cameras/KeyFrames associated members
     int mSizeofCameras;
