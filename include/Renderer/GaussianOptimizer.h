@@ -50,6 +50,57 @@ private:
     size_t _buffer_size;
 };
 
+// Indice tree
+class GaussianIndiceNode{
+
+public:
+
+// Constructor for non root nodes
+GaussianIndiceNode(int Indice):mIndice(Indice){
+    mChildren = std::vector<GaussianIndiceNode*>(mMaxChildNum,static_cast<GaussianIndiceNode*>(NULL)); 
+}
+//Constructor for roots
+GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
+    mChildren = std::vector<GaussianIndiceNode*>(mMaxChildNum,static_cast<GaussianIndiceNode*>(NULL)); 
+}
+
+// void AddChild(GaussianIndiceNode* newGaussian);
+// void DeleteChild(GaussianIndiceNode* newGaussian);
+// void SetInactiveState(GaussianIndiceNode* newGaussian);
+
+private:
+    int mIndice;            // Indice for indexing Gaussians
+    int mMaxChildNum = 5;   // Maximum children numbers
+    int mChildNum = 0;      // Non-NULL number of children
+    bool mActive = true;    // Change only for root
+    bool mIsRoot = false;
+    std::vector<GaussianIndiceNode*> mChildren;
+
+    // MapGaussianNode* AddChild(MapGaussian* newData){
+    //     MapGaussianNode*  newNode = new MapGaussianNode(newData);
+    //     for(int i = 0; i<ChildNum; i++){
+    //         if(children[i] == NULL){
+    //             children[i] = newNode;
+    //             break;
+    //         }
+    //     }
+    //     return newNode;
+    // }
+};
+
+class GaussianIndiceTree
+{
+    private:
+        GaussianIndiceNode* mRroot;
+    
+    public:
+        GaussianIndiceTree():mRroot(NULL){}
+        GaussianIndiceTree(int Indice, bool IsRoot = true):mRroot(new GaussianIndiceNode(Indice, IsRoot)){}
+        ~GaussianIndiceTree(){ delete mRroot; }
+        
+        GaussianIndiceNode* GetRoot(){ return mRroot; }
+};
+
 
 class GaussianOptimizer
 {
@@ -66,7 +117,7 @@ public:
     std::pair<torch::Tensor, float> GetNerfppNorm();
     std::pair<torch::Tensor, float> GetCenterAndDiag();
 
-    // Getter
+    // Getters
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
     torch::Tensor SetProjMatrix();
 
@@ -103,8 +154,12 @@ public:
     // Learning rate updater
     void UpdateLR(float iteration);
 
-    //utils
+    // Utils
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
+
+    // Tree management
+    // InitializeIndiceTree();
+    // UpdateIndiceTree();
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
@@ -166,7 +221,8 @@ protected:
     const float mC1 = 0.01 * 0.01;
     const float mC2 = 0.03 * 0.03;
 
-    // For densification
+    // For tree management
+    std::vector<GaussianIndiceTree*> mvpGaussianIndiceForest;
     
 };
 

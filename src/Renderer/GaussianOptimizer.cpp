@@ -1,6 +1,7 @@
 #include "GaussianOptimizer.h"
 #include "Renderer/Rasterizer.h"
 
+#include <algorithm>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <memory>
 
@@ -36,7 +37,6 @@ GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &Op
 
 void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapGaussian *> &vpMG)
 {
-
     std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussians in Map: " << vpMG.size() << std::endl;
     
     // Get Gaussian Data
@@ -46,7 +46,11 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
 
+
     torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    
+    mvpGaussianIndiceForest = std::vector<GaussianIndiceTree*>(mSizeofGaussians,static_cast<GaussianIndiceTree*>(NULL)); // Initialize tree structure
+
     for(size_t i=0; i<vpMG.size(); i++)
     {
         ORB_SLAM3::MapGaussian* pMG = vpMG[i];
@@ -57,6 +61,10 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
             mScales.index_put_({(int)i, "..."},   pMG->GetScale());
             mRotation.index_put_({(int)i, "..."}, pMG->GetRotation());
             Features.index_put_({(int)i, "..."}, pMG->GetFeature());
+
+            // Set root nodes
+            GaussianIndiceTree* pGIT = new GaussianIndiceTree(i, true);
+            mvpGaussianIndiceForest[i] = pGIT;
         }
     }
 
@@ -69,7 +77,6 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     mRotation.set_requires_grad(true);
     mFeaturesDC.set_requires_grad(true);
     mFeaturesRest.set_requires_grad(true);
-
     // std::cout << "[GaussianSplatting::Optimize] mFeatures: " << mFeatures << std::endl;
     
     // Get Camera and Image Data
@@ -113,6 +120,9 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     // Setup Loss Monitor
     mLossMonitor = new GaussianSplatting::LossMonitor(200);
     mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
+
+    // Initialize indice tree
+    // InitializeIndiceTree();
 }
 
 void GaussianOptimizer::Optimize()
@@ -171,7 +181,7 @@ void GaussianOptimizer::Optimize()
         auto L1loss =L1Loss(GTImg, rendererd_image);
         auto SSIMloss = SSIM(rendererd_image, GTImg);
         auto loss = (1.f - mOptimParams.lambda_dssim) * L1loss + mOptimParams.lambda_dssim * (1.f - SSIMloss);
-        loss.backward();
+        loss.backward(); 
         std::cout << "[GaussianSplatting::Optimize] Loss: " << loss << std::endl;
 
         { 
@@ -183,6 +193,8 @@ void GaussianOptimizer::Optimize()
                 if (iter > mOptimParams.densify_from_iter && iter % mOptimParams.densification_interval == 0) {
                     float size_threshold = iter > mOptimParams.opacity_reset_interval ? 20.f : -1.f;
                     DensifyAndPrune(mOptimParams.densify_grad_threshold, mOptimParams.min_opacity, size_threshold);
+                    // Update indice tree (delete for prune, creation for densify)
+                    // UpdateIndiceTree();
                 }
 
                 if (iter % mOptimParams.opacity_reset_interval == 0 || (mWhiteBackground && iter == mOptimParams.densify_from_iter)) {

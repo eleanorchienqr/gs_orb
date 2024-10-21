@@ -5606,6 +5606,8 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
     GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
     optimizer.InitializeOptimization(vpKFs, vpMG);
     optimizer.Optimize();
+
+    // Recover optimized data
 }
 
 } //namespace ORB_SLAM
