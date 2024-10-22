@@ -49,7 +49,7 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
 
     torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     
-    mvpGaussianIndiceForest = std::vector<GaussianIndiceTree*>(mSizeofGaussians,static_cast<GaussianIndiceTree*>(NULL)); // Initialize tree structure
+    // mvpGaussianIndiceForest = std::vector<GaussianIndiceTree*>(mSizeofGaussians,static_cast<GaussianIndiceTree*>(NULL)); // Initialize tree structure
     mvpGaussianIndiceNodes = std::vector<GaussianIndiceNode*>(mSizeofGaussians,static_cast<GaussianIndiceNode*>(NULL)); // Initialize node vector
 
     for(size_t i=0; i<vpMG.size(); i++)
@@ -64,8 +64,8 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
             Features.index_put_({(int)i, "..."}, pMG->GetFeature());
 
             // Set root nodes and trees
-            GaussianIndiceTree* pGIT = new GaussianIndiceTree(i, true);
-            mvpGaussianIndiceForest[i] = pGIT;
+            // GaussianIndiceTree* pGIT = new GaussianIndiceTree(i, true);
+            // mvpGaussianIndiceForest[i] = pGIT;
 
             GaussianIndiceNode* pGIN = new GaussianIndiceNode(i, true);
             mvpGaussianIndiceNodes[i] = pGIN;
@@ -371,32 +371,51 @@ void GaussianOptimizer::UpdateIndiceForestAfterSplit(const torch::Tensor indices
     if(SpltNum)
     {
         std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] IndicesVec Numel: " << Indices.numel() << std::endl;
-
         std::vector<long> IndicesVec(Indices.data_ptr<long>(), Indices.data_ptr<long>() + SpltNum);
-        int NodeNum = mvpGaussianIndiceNodes.size() + SpltNum;
-        mvpGaussianIndiceNodes.resize(NodeNum);
-        // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] ReverseTest: " << NodeNum << std::endl;
-        // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] mvpGaussianIndiceNodes: " << mvpGaussianIndiceNodes.size() << std::endl;
+
+        int ActualNodeNum = mvpGaussianIndiceNodes.size();
+        const int OriginalNodeNum = mvpGaussianIndiceNodes.size();
+        const int IncresedNodeNum = mvpGaussianIndiceNodes.size() + SpltNum * 2;
+        mvpGaussianIndiceNodes.resize(IncresedNodeNum);
+        std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] mvpGaussianIndiceNodes: " << mvpGaussianIndiceNodes.size() << std::endl;
 
         for(int i = 0; i < SpltNum; i++)
         {
-            // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] AddSplitNode: " << IndicesVec[i] << std::endl;
             GaussianIndiceNode* pGIN = mvpGaussianIndiceNodes[IndicesVec[i]];
 
             if(pGIN)
             {
+                const int RootIndex = pGIN->mRootIndex;
+                GaussianIndiceNode* pRoootGIN = mvpGaussianIndiceNodes[RootIndex];
+
+                // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] AddSplitNode Root: " << RootIndex << std::endl;
+
                 if(pGIN->mIsRoot)
                 {
+                    // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] AddSplitNewNode index: " << OriginalNodeNum+i << std::endl;
+                    GaussianIndiceNode* SplitNode1 = new GaussianIndiceNode(OriginalNodeNum + 2*i, RootIndex);
+                    GaussianIndiceNode* SplitNode2 = new GaussianIndiceNode(OriginalNodeNum + 2*i + 1, RootIndex);
+
+                    // SplitNode1->SetAttributes(FatherIndex, Layer, IndexInLaayer);
+                    // SplitNode2->SetAttributes(FatherIndex, Layer, IndexInLaayer);
+                    // pRoootGIN->SetInactiveState();
+                    // pRoootGIN->AddChildIndex();
+
+                    mvpGaussianIndiceNodes[OriginalNodeNum + 2*i] = SplitNode1;
+                    mvpGaussianIndiceNodes[OriginalNodeNum + 2*i  + 1] = SplitNode2;
+
+                    ActualNodeNum += 2;
 
                 }
                 else
                 {
 
                 }
+
             }
             
         }
-        // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] IndicesVec: " << IndicesVec << std::endl;
+        std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] Node Number After Split: " << ActualNodeNum << std::endl;
 
     }
 

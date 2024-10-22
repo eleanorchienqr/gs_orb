@@ -57,25 +57,25 @@ public:
 
 // Constructor for non root nodes
 GaussianIndiceNode(int Indice, int RootIndex):mIndice(Indice), mRootIndex(RootIndex){
-    mChildren = std::vector<GaussianIndiceNode*>(mMaxChildNum,static_cast<GaussianIndiceNode*>(NULL)); 
+    mChildrenIndices = std::vector<int>(mMaxChildNum); 
 }
 //Constructor for roots
 GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
-    mChildren = std::vector<GaussianIndiceNode*>(mMaxChildNum,static_cast<GaussianIndiceNode*>(NULL)); 
+    mChildrenIndices = std::vector<int>(mMaxChildNum); 
     mRootIndex = Indice;
 }
 
-// void AddChild(GaussianIndiceNode* newGaussian);
+// void AddChildIndex(GaussianIndiceNode* newGaussian);
 // void DeleteChild(GaussianIndiceNode* newGaussian);
 // void SetInactiveState(GaussianIndiceNode* newGaussian);
 
 private:
     int mIndice;            // Index for indexing Gaussians
-    int mRootIndex;         // Index of root node
     int mMaxChildNum = 5;   // Maximum children numbers
     int mChildNum = 0;      // Non-NULL number of children
     bool mActive = true;    // Change only for root
-    std::vector<GaussianIndiceNode*> mChildren;
+    std::vector<int> mChildrenIndices;
+    // std::vector<GaussianIndiceNode*> mChildren;
 
     // MapGaussianNode* AddChild(MapGaussian* newData){
     //     MapGaussianNode*  newNode = new MapGaussianNode(newData);
@@ -89,20 +89,21 @@ private:
     // }
 public:
     bool mIsRoot = false;
+    int mRootIndex;         // Index of root node
 };
 
-class GaussianIndiceTree
-{
-    private:
-        GaussianIndiceNode* mRroot;
+// class GaussianIndiceTree
+// {
+//     private:
+//         GaussianIndiceNode* mRroot;
     
-    public:
-        GaussianIndiceTree():mRroot(NULL){}
-        GaussianIndiceTree(int Indice, bool IsRoot = true):mRroot(new GaussianIndiceNode(Indice, IsRoot)){}
-        ~GaussianIndiceTree(){ delete mRroot; }
+//     public:
+//         GaussianIndiceTree():mRroot(NULL){}
+//         GaussianIndiceTree(int Indice, bool IsRoot = true):mRroot(new GaussianIndiceNode(Indice, IsRoot)){}
+//         ~GaussianIndiceTree(){ delete mRroot; }
         
-        GaussianIndiceNode* GetRoot(){ return mRroot; }
-};
+//         GaussianIndiceNode* GetRoot(){ return mRroot; }
+// };
 
 
 class GaussianOptimizer
@@ -228,7 +229,7 @@ protected:
     const float mC2 = 0.03 * 0.03;
 
     // For tree management
-    std::vector<GaussianIndiceTree*> mvpGaussianIndiceForest;
+    // std::vector<GaussianIndiceTree*> mvpGaussianIndiceForest;
     std::vector<GaussianIndiceNode*> mvpGaussianIndiceNodes; // correspond to mMeans3D index
     
 };
