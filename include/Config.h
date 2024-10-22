@@ -76,7 +76,7 @@ struct OptimizationParameters
     float rotation_lr = 0.001f;
     float lambda_dssim = 0.2f;
     float min_opacity = 0.005f;
-    uint64_t densification_interval = 100;
+    uint64_t densification_interval = 1200; //10
     uint64_t opacity_reset_interval = 200; // 3'000
     uint64_t densify_from_iter = 50; // 500
     uint64_t densify_until_iter = 1500; // 15'000

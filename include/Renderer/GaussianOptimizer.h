@@ -56,12 +56,13 @@ class GaussianIndiceNode{
 public:
 
 // Constructor for non root nodes
-GaussianIndiceNode(int Indice):mIndice(Indice){
+GaussianIndiceNode(int Indice, int RootIndex):mIndice(Indice), mRootIndex(RootIndex){
     mChildren = std::vector<GaussianIndiceNode*>(mMaxChildNum,static_cast<GaussianIndiceNode*>(NULL)); 
 }
 //Constructor for roots
 GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
     mChildren = std::vector<GaussianIndiceNode*>(mMaxChildNum,static_cast<GaussianIndiceNode*>(NULL)); 
+    mRootIndex = Indice;
 }
 
 // void AddChild(GaussianIndiceNode* newGaussian);
@@ -69,11 +70,11 @@ GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
 // void SetInactiveState(GaussianIndiceNode* newGaussian);
 
 private:
-    int mIndice;            // Indice for indexing Gaussians
+    int mIndice;            // Index for indexing Gaussians
+    int mRootIndex;         // Index of root node
     int mMaxChildNum = 5;   // Maximum children numbers
     int mChildNum = 0;      // Non-NULL number of children
     bool mActive = true;    // Change only for root
-    bool mIsRoot = false;
     std::vector<GaussianIndiceNode*> mChildren;
 
     // MapGaussianNode* AddChild(MapGaussian* newData){
@@ -86,6 +87,8 @@ private:
     //     }
     //     return newNode;
     // }
+public:
+    bool mIsRoot = false;
 };
 
 class GaussianIndiceTree
@@ -158,8 +161,11 @@ public:
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
 
     // Tree management
-    // InitializeIndiceTree();
-    // UpdateIndiceTree();
+    void UpdateIndiceForestAfterClone(const torch::Tensor indices);
+    void UpdateIndiceForestAfterSplit(const torch::Tensor indices);
+    // void UpdateIndiceForestAfterPrune(const torch::Tensor indices);
+
+    // GaussianIndiceNode* FindNodeFromIndex(const long index);
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
@@ -223,6 +229,7 @@ protected:
 
     // For tree management
     std::vector<GaussianIndiceTree*> mvpGaussianIndiceForest;
+    std::vector<GaussianIndiceNode*> mvpGaussianIndiceNodes; // correspond to mMeans3D index
     
 };
 
