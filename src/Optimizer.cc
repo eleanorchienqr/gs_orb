@@ -5596,6 +5596,8 @@ void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, bool *pbS
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
     vector<MapGaussian*> vpMG = pMap->GetAllMapGaussians();
     // BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
+    // vector<MapGaussianNode*> vpMGN = pMap->GetMapGaussianNodes();
+    // GaussianOptimization(vpKFs,vpMP,vpMGN,nIterations,pbStopFlag, nLoopKF, bRobust);
     GaussianOptimization(vpKFs,vpMP,vpMG,nIterations,pbStopFlag, nLoopKF, bRobust);
 }
 
@@ -5608,6 +5610,9 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
     optimizer.Optimize();
 
     // Recover optimized data
+    // optimizer->mvpGaussianRootIndex
+    // vpMG.resize(mvpGaussianRootIndex.size())
+    // return std::vector<MapGaussianNode* >
 }
 
 } //namespace ORB_SLAM

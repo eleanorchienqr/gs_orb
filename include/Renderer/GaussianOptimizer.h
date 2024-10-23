@@ -50,47 +50,47 @@ private:
     size_t _buffer_size;
 };
 
-// Indice tree
-class GaussianIndiceNode{
+// // Indice tree
+// class GaussianIndiceNode{
 
-public:
+// public:
 
-// Constructor for non root nodes
-GaussianIndiceNode(int Indice, int RootIndex):mIndice(Indice), mRootIndex(RootIndex){
-    mChildrenIndices = std::vector<int>(mMaxChildNum); 
-}
-//Constructor for roots
-GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
-    mChildrenIndices = std::vector<int>(mMaxChildNum); 
-    mRootIndex = Indice;
-}
+// // Constructor for non root nodes
+// GaussianIndiceNode(int Indice, int RootIndex):mIndice(Indice), mRootIndex(RootIndex){
+//     mChildrenIndices = std::vector<int>(mMaxChildNum); 
+// }
+// //Constructor for roots
+// GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
+//     mChildrenIndices = std::vector<int>(mMaxChildNum); 
+//     mRootIndex = Indice;
+// }
 
-// void AddChildIndex(GaussianIndiceNode* newGaussian);
-// void DeleteChild(GaussianIndiceNode* newGaussian);
-// void SetInactiveState(GaussianIndiceNode* newGaussian);
+// // void AddChildIndex(GaussianIndiceNode* newGaussian);
+// // void DeleteChild(GaussianIndiceNode* newGaussian);
+// // void SetInactiveState(GaussianIndiceNode* newGaussian);
 
-private:
-    int mIndice;            // Index for indexing Gaussians
-    int mMaxChildNum = 5;   // Maximum children numbers
-    int mChildNum = 0;      // Non-NULL number of children
-    bool mActive = true;    // Change only for root
-    std::vector<int> mChildrenIndices;
-    // std::vector<GaussianIndiceNode*> mChildren;
+// private:
+//     int mIndice;            // Index for indexing Gaussians
+//     int mMaxChildNum = 5;   // Maximum children numbers
+//     int mChildNum = 0;      // Non-NULL number of children
+//     bool mActive = true;    // Change only for root
+//     std::vector<int> mChildrenIndices;
+//     // std::vector<GaussianIndiceNode*> mChildren;
 
-    // MapGaussianNode* AddChild(MapGaussian* newData){
-    //     MapGaussianNode*  newNode = new MapGaussianNode(newData);
-    //     for(int i = 0; i<ChildNum; i++){
-    //         if(children[i] == NULL){
-    //             children[i] = newNode;
-    //             break;
-    //         }
-    //     }
-    //     return newNode;
-    // }
-public:
-    bool mIsRoot = false;
-    int mRootIndex;         // Index of root node
-};
+//     // MapGaussianNode* AddChild(MapGaussian* newData){
+//     //     MapGaussianNode*  newNode = new MapGaussianNode(newData);
+//     //     for(int i = 0; i<ChildNum; i++){
+//     //         if(children[i] == NULL){
+//     //             children[i] = newNode;
+//     //             break;
+//     //         }
+//     //     }
+//     //     return newNode;
+//     // }
+// public:
+//     bool mIsRoot = false;
+//     int mRootIndex;         // Index of root node
+// };
 
 // class GaussianIndiceTree
 // {
@@ -164,9 +164,7 @@ public:
     // Tree management
     void UpdateIndiceForestAfterClone(const torch::Tensor indices);
     void UpdateIndiceForestAfterSplit(const torch::Tensor indices);
-    // void UpdateIndiceForestAfterPrune(const torch::Tensor indices);
-
-    // GaussianIndiceNode* FindNodeFromIndex(const long index);
+    void UpdateIndiceForestAfterPrune(const torch::Tensor indices);
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
@@ -229,8 +227,9 @@ protected:
     const float mC2 = 0.03 * 0.03;
 
     // For tree management
+    std::vector<long> mvpGaussianRootIndex; // Same
     // std::vector<GaussianIndiceTree*> mvpGaussianIndiceForest;
-    std::vector<GaussianIndiceNode*> mvpGaussianIndiceNodes; // correspond to mMeans3D index
+    // std::vector<GaussianIndiceNode*> mvpGaussianIndiceNodes; // correspond to mMeans3D index
     
 };
 

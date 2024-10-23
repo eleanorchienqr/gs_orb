@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <memory>
+#include <cassert>
 
 namespace GaussianSplatting{
 
@@ -49,8 +50,7 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
 
     torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     
-    // mvpGaussianIndiceForest = std::vector<GaussianIndiceTree*>(mSizeofGaussians,static_cast<GaussianIndiceTree*>(NULL)); // Initialize tree structure
-    mvpGaussianIndiceNodes = std::vector<GaussianIndiceNode*>(mSizeofGaussians,static_cast<GaussianIndiceNode*>(NULL)); // Initialize node vector
+    mvpGaussianRootIndex = std::vector<long>(mSizeofGaussians, static_cast<long>(-1));
 
     for(size_t i=0; i<vpMG.size(); i++)
     {
@@ -63,12 +63,7 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
             mRotation.index_put_({(int)i, "..."}, pMG->GetRotation());
             Features.index_put_({(int)i, "..."}, pMG->GetFeature());
 
-            // Set root nodes and trees
-            // GaussianIndiceTree* pGIT = new GaussianIndiceTree(i, true);
-            // mvpGaussianIndiceForest[i] = pGIT;
-
-            GaussianIndiceNode* pGIN = new GaussianIndiceNode(i, true);
-            mvpGaussianIndiceNodes[i] = pGIN;
+            mvpGaussianRootIndex[i] = i;
         }
     }
 
@@ -81,7 +76,6 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     mRotation.set_requires_grad(true);
     mFeaturesDC.set_requires_grad(true);
     mFeaturesRest.set_requires_grad(true);
-    // std::cout << "[GaussianSplatting::Optimize] mFeatures: " << mFeatures << std::endl;
     
     // Get Camera and Image Data
     mSizeofCameras = vpKFs.size();
@@ -194,8 +188,6 @@ void GaussianOptimizer::Optimize()
                 if (iter > mOptimParams.densify_from_iter && iter % mOptimParams.densification_interval == 0) {
                     float size_threshold = iter > mOptimParams.opacity_reset_interval ? 20.f : -1.f;
                     DensifyAndPrune(mOptimParams.densify_grad_threshold, mOptimParams.min_opacity, size_threshold);
-                    // Update indice tree (delete for prune, creation for densify)
-                    // UpdateIndiceTree();
                 }
 
                 if (iter % mOptimParams.opacity_reset_interval == 0 || (mWhiteBackground && iter == mOptimParams.densify_from_iter)) {
@@ -237,6 +229,9 @@ void GaussianOptimizer::DensifyAndClone(torch::Tensor& grads, float grad_thresho
 
     auto indices = torch::nonzero(selected_pts_mask.squeeze(-1) == true).index({torch::indexing::Slice(torch::indexing::None, torch::indexing::None), torch::indexing::Slice(torch::indexing::None, 1)}).squeeze(-1);
     
+    // Update mvpGaussianIndiceForest before mMeans3D is expanded
+    UpdateIndiceForestAfterClone(indices);
+
     torch::Tensor newMeans3D = mMeans3D.index_select(0, indices);
     torch::Tensor newFeaturesDC = mFeaturesDC.index_select(0, indices);
     torch::Tensor newFeaturesRest = mFeaturesRest.index_select(0, indices);
@@ -245,22 +240,29 @@ void GaussianOptimizer::DensifyAndClone(torch::Tensor& grads, float grad_thresho
     torch::Tensor newRotation = mRotation.index_select(0, indices);
 
     DensificationPostfix(newMeans3D, newFeaturesDC, newFeaturesRest, newScales, newRotation, newOpacity);
+    mSizeofGaussians += indices.contiguous().numel();
+    assert( mMeans3D.sizes()[0] == mSizeofGaussians );
 
-    // Update mvpGaussianIndiceForest
-    UpdateIndiceForestAfterClone(indices);
+    std::cout << "[GaussianSplatting::Gaussian Numbers] [AfterClone] " << mSizeofGaussians << std::endl;
 }
 
 void GaussianOptimizer::UpdateIndiceForestAfterClone(const torch::Tensor indices)
 {
-    torch::Tensor Indices = indices.contiguous();
+    torch::Tensor Indices = indices.contiguous().cpu();
+    int CloneNum = Indices.numel();
     
-    if(Indices.numel())
+    if(CloneNum)
     {
-        std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterClone] IndicesVec Numel: " << Indices.numel() << std::endl;
+        std::vector<long> IndicesVec(Indices.data_ptr<long>(), Indices.data_ptr<long>() + CloneNum);
 
-        // std::vector<unsigned long int> IndicesVec(Indices.data_ptr<unsigned long int>(), Indices.data_ptr<unsigned long int>() + Indices.numel());
-        
-        // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterClone] IndicesVec: " << IndicesVec << std::endl;
+        const int OriginalNodeNum = mvpGaussianRootIndex.size();
+        const int AfterCloneNodeNum = mvpGaussianRootIndex.size() + CloneNum;
+        mvpGaussianRootIndex.resize(AfterCloneNodeNum);
+
+        for(int i = 0; i < CloneNum; i++)
+            mvpGaussianRootIndex[OriginalNodeNum + i] = mvpGaussianRootIndex[IndicesVec[i]];
+            
+        std::cout << "[GaussianSplatting::RootIndexSize] [AfterClone] " << mvpGaussianRootIndex.size() << std::endl;
     }
 }
 
@@ -350,17 +352,19 @@ void GaussianOptimizer::DensifyAndSplit(torch::Tensor& grads, float grad_thresho
     torch::Tensor newFeaturesRest = mFeaturesRest.index_select(0, indices).repeat({N, 1, 1});
     torch::Tensor newOpacity = mOpacity.index_select(0, indices).repeat({N, 1});
 
-    // std::cout << "[GaussianSplatting::Densification Split] indices: " << indices << std::endl;
+    // Update mvpGaussianIndiceForest before mMeans3D ia expanded
+    UpdateIndiceForestAfterSplit(indices);
 
     DensificationPostfix(newMeans3D, newFeaturesDC, newFeaturesRest, newScales, newRotation, newOpacity);
+    mSizeofGaussians = mMeans3D.sizes()[0];
 
-    // Update mvpGaussianIndiceForest
-    UpdateIndiceForestAfterSplit(indices);
+    std::cout << "[GaussianSplatting::Gaussian Numbers] [AfterSplit] " << mSizeofGaussians << std::endl;
 
     torch::Tensor prune_filter = torch::cat({selected_pts_mask.squeeze(-1), torch::zeros({N * selected_pts_mask.sum().item<int>()}).to(torch::kBool).to(torch::kCUDA)});
     prune_filter = torch::logical_or(prune_filter, (torch::sigmoid(mOpacity) < min_opacity).squeeze(-1));
     PrunePoints(prune_filter);
 
+    std::cout << "[GaussianSplatting::Gaussian Numbers] [AfterPrune] " << mSizeofGaussians << std::endl;
 }
 
 void GaussianOptimizer::UpdateIndiceForestAfterSplit(const torch::Tensor indices)
@@ -370,53 +374,19 @@ void GaussianOptimizer::UpdateIndiceForestAfterSplit(const torch::Tensor indices
     
     if(SpltNum)
     {
-        std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] IndicesVec Numel: " << Indices.numel() << std::endl;
         std::vector<long> IndicesVec(Indices.data_ptr<long>(), Indices.data_ptr<long>() + SpltNum);
 
-        int ActualNodeNum = mvpGaussianIndiceNodes.size();
-        const int OriginalNodeNum = mvpGaussianIndiceNodes.size();
-        const int IncresedNodeNum = mvpGaussianIndiceNodes.size() + SpltNum * 2;
-        mvpGaussianIndiceNodes.resize(IncresedNodeNum);
-        std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] mvpGaussianIndiceNodes: " << mvpGaussianIndiceNodes.size() << std::endl;
+        const int OriginalNodeNum = mvpGaussianRootIndex.size();
+        const int AfterSplitNodeNum = mvpGaussianRootIndex.size() + SpltNum * 2;
+        mvpGaussianRootIndex.resize(AfterSplitNodeNum);
 
         for(int i = 0; i < SpltNum; i++)
         {
-            GaussianIndiceNode* pGIN = mvpGaussianIndiceNodes[IndicesVec[i]];
-
-            if(pGIN)
-            {
-                const int RootIndex = pGIN->mRootIndex;
-                GaussianIndiceNode* pRoootGIN = mvpGaussianIndiceNodes[RootIndex];
-
-                // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] AddSplitNode Root: " << RootIndex << std::endl;
-
-                if(pGIN->mIsRoot)
-                {
-                    // std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] AddSplitNewNode index: " << OriginalNodeNum+i << std::endl;
-                    GaussianIndiceNode* SplitNode1 = new GaussianIndiceNode(OriginalNodeNum + 2*i, RootIndex);
-                    GaussianIndiceNode* SplitNode2 = new GaussianIndiceNode(OriginalNodeNum + 2*i + 1, RootIndex);
-
-                    // SplitNode1->SetAttributes(FatherIndex, Layer, IndexInLaayer);
-                    // SplitNode2->SetAttributes(FatherIndex, Layer, IndexInLaayer);
-                    // pRoootGIN->SetInactiveState();
-                    // pRoootGIN->AddChildIndex();
-
-                    mvpGaussianIndiceNodes[OriginalNodeNum + 2*i] = SplitNode1;
-                    mvpGaussianIndiceNodes[OriginalNodeNum + 2*i  + 1] = SplitNode2;
-
-                    ActualNodeNum += 2;
-
-                }
-                else
-                {
-
-                }
-
-            }
-            
+            mvpGaussianRootIndex[OriginalNodeNum + i] = mvpGaussianRootIndex[IndicesVec[i]];
+            mvpGaussianRootIndex[OriginalNodeNum + SpltNum + i] = mvpGaussianRootIndex[IndicesVec[i]];
         }
-        std::cout << "[GaussianSplatting::Tree Management] [UpdateIndiceForestAfterSplit] Node Number After Split: " << ActualNodeNum << std::endl;
 
+        std::cout << "[GaussianSplatting::RootIndexSize] [AfterSplit] " << mvpGaussianRootIndex.size() << std::endl;
     }
 
 }
@@ -427,6 +397,10 @@ void GaussianOptimizer::PrunePoints(torch::Tensor mask)
     auto valid_point_mask = ~mask;
     int true_count = valid_point_mask.sum().item<int>();
     auto indices = torch::nonzero(valid_point_mask == true).index({torch::indexing::Slice(torch::indexing::None, torch::indexing::None), torch::indexing::Slice(torch::indexing::None, 1)}).squeeze(-1);
+    
+    // Update mvpGaussianIndiceForest
+    UpdateIndiceForestAfterPrune(indices);
+
     PruneOptimizer(mMeans3D, indices, 0);
     PruneOptimizer(mFeaturesDC, indices, 1);
     PruneOptimizer(mFeaturesRest, indices, 2);
@@ -439,8 +413,29 @@ void GaussianOptimizer::PrunePoints(torch::Tensor mask)
     mPosGradientAccum = mPosGradientAccum.index_select(0, indices);
     mDenom = mDenom.index_select(0, indices);
     // _max_radii2D = _max_radii2D.index_select(0, indices);
+    mSizeofGaussians = mMeans3D.sizes()[0];
+}
 
-    // Update mvpGaussianIndiceForest
+void GaussianOptimizer::UpdateIndiceForestAfterPrune(const torch::Tensor indices)
+{
+    torch::Tensor Indices = indices.contiguous().cpu();
+    int AfterPruneNum = Indices.numel();
+    
+    if(AfterPruneNum)
+    {
+        std::vector<long> GaussianRootIndex(AfterPruneNum, -1);
+        std::vector<long> IndicesVec(Indices.data_ptr<long>(), Indices.data_ptr<long>() + AfterPruneNum);
+        
+        for(int i = 0; i < AfterPruneNum; i++)
+            GaussianRootIndex[i] = mvpGaussianRootIndex[IndicesVec[i]];
+
+        mvpGaussianRootIndex = GaussianRootIndex;
+
+        // for(int i = 0; i < AfterPruneNum; i++)
+        //     std::cout << "[GaussianSplatting::RootIndex] [AfterPrune] " << mvpGaussianRootIndex[i] << std::endl;
+    
+        std::cout << "[GaussianSplatting::RootIndexSize] [AfterPrune] " << mvpGaussianRootIndex.size() << std::endl;
+    }
 
 }
 
