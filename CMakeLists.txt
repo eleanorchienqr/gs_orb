@@ -46,9 +46,9 @@ set(SIMPLE_KNN_SOURCES
 )
 
 # OpenCV
-find_package(OpenCV 4.4)
+find_package(OpenCV 4.8)
    if(NOT OpenCV_FOUND)
-      message(FATAL_ERROR "OpenCV > 4.4 not found.")
+      message(FATAL_ERROR "OpenCV > 4.8 not found.")
    endif()
 
 MESSAGE("OPENCV VERSION:")
