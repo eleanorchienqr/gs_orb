@@ -104,6 +104,7 @@ src/ORBmatcher.cc
 src/FrameDrawer.cc
 src/Converter.cc
 src/MapGaussian.cc
+src/MapGaussianCluster.cc
 src/MapPoint.cc
 src/KeyFrame.cc
 src/Atlas.cc
@@ -147,6 +148,7 @@ include/ORBmatcher.h
 include/FrameDrawer.h
 include/Converter.h
 include/MapGaussian.h
+include/MapGaussianCluster.h
 include/MapPoint.h
 include/KeyFrame.h
 include/Atlas.h
