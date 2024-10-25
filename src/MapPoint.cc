@@ -45,6 +45,10 @@ MapPoint::MapPoint(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap):
 {
     SetWorldPos(Pos);
 
+    #ifdef GAUSSIANSPLATTING
+    InitializeGaussianCluster(Pos);
+    #endif
+
     mNormalVector.setZero();
 
     mbTrackInViewR = false;
@@ -124,6 +128,25 @@ void MapPoint::SetWorldPos(const Eigen::Vector3f &Pos) {
 Eigen::Vector3f MapPoint::GetWorldPos() {
     unique_lock<mutex> lock(mMutexPos);
     return mWorldPos;
+}
+
+void MapPoint::InitializeGaussianCluster(const Eigen::Vector3f &Pos)
+{
+    const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
+    const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
+
+    Eigen::Vector3f PosTranspose = Pos.transpose();
+    mGauWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA);
+    mGauWorldRot = torch::zeros({1, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
+    mGauScale = torch::zeros({1, 3}).to(torch::kCUDA, true); // Leave scales later in Optimization
+    mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({1, 1})).to(torch::kCUDA, true);
+    mGauFeatureDC = Converter::RGB2SH(torch::zeros({1, 3})).to(torch::kCUDA, true);
+    mGauFeaturest = torch::zeros({1, FeaturestDim}).to(torch::kCUDA, true);
+
+    // std::cout << "[InitializeGaussianCluster] WorldPos of MapPoint: " << PosTranspose << std::endl;
+    // std::cout << "[InitializeGaussianCluster] WorldPos of Gaussian: " << mGauWorldPos << std::endl;
+    // std::cout << "[InitializeGaussianCluster] mOpacity of Gaussian: " << mGauOpacity << std::endl;
+    // std::cout << std:: endl;
 }
 
 Eigen::Vector3f MapPoint::GetNormal() {

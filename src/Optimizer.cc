@@ -5601,6 +5601,14 @@ void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, bool *pbS
     GaussianOptimization(vpKFs,vpMP,vpMG,nIterations,pbStopFlag, nLoopKF, bRobust);
 }
 
+void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale)
+{
+    vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
+    vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
+    GaussianOptimization(vpKFs,vpMP,nIterations, bInitializeScale);
+}
+
+
 void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, const vector<MapGaussian *> &vpMG, 
                                  int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
 {
@@ -5613,6 +5621,15 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
     // optimizer->mvpGaussianRootIndex
     // vpMG.resize(mvpGaussianRootIndex.size())
     // return std::vector<MapGaussianNode* >
+}
+
+void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale)
+{
+    ORB_SLAM3::OptimizationParameters OptimParams;
+    GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
+    optimizer.InitializeOptimizationUpdate(vpKFs, vpMP, bInitializeScale);
+    // optimizer.Optimize();
+
 }
 
 } //namespace ORB_SLAM

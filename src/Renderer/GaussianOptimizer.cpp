@@ -120,6 +120,33 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
 }
 
+void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale)
+{
+    std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << vpMP.size() << std::endl;
+    
+    if(bInitializeScale) 
+    {
+        // Get Gaussian Data
+        mSizeofGaussians = 0;
+        // for(int i = 0; i < vpMP.size(); i++)
+        //     mSizeofGaussians += vpMP[i]->GetGaussianNum();
+
+        // mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+        // mOpacity = torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+        // mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+        // mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+        // torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    
+        // mvpGaussianRootIndex = std::vector<long>(mSizeofGaussians, static_cast<long>(-1));
+        
+        // for(int i = 0; i < vpMP.size(); i++)
+        // {
+
+        // }
+    }
+    
+}
+
 void GaussianOptimizer::Optimize()
 {
     std::cout << "[GaussianOptimizer::Optimize] Start" << std::endl;

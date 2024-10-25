@@ -28,6 +28,7 @@
 #include "SerializationUtils.h"
 
 #include <opencv2/core/core.hpp>
+#include <torch/torch.h>
 #include <mutex>
 
 #include <boost/serialization/serialization.hpp>
@@ -100,6 +101,11 @@ class MapPoint
         ar & mfMinDistance;
         ar & mfMaxDistance;
 
+        // Gaussian
+        ar & mGauNum;
+        ar & mGauSHDegree;
+        // torch serialization
+
     }
 
 
@@ -113,6 +119,9 @@ public:
 
     void SetWorldPos(const Eigen::Vector3f &Pos);
     Eigen::Vector3f GetWorldPos();
+
+    // Gaussian Setter
+    void InitializeGaussianCluster(const Eigen::Vector3f &Pos);
 
     Eigen::Vector3f GetNormal();
     void SetNormalVector(const Eigen::Vector3f& normal);
@@ -208,6 +217,17 @@ public:
     unsigned int mnOriginMapId;
 
 protected:    
+
+    // Gaussian Members, serialization ?
+    long unsigned int mGauNum = 1;
+    long unsigned int mGauSHDegree = 3;
+
+    torch::Tensor mGauWorldPos;            // {mGauNum, 3}
+    torch::Tensor mGauWorldRot;            // {mGauNum, 4}
+    torch::Tensor mGauScale;               // {mGauNum, 3}
+    torch::Tensor mGauOpacity;             // {mGauNum, 1}
+    torch::Tensor mGauFeatureDC;           // {mGauNum, 3}
+    torch::Tensor mGauFeaturest;           // {mGauNum, (mSHDegree+1)**2 - 1}
 
      // Position in absolute coordinates
      Eigen::Vector3f mWorldPos;

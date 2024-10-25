@@ -29,6 +29,8 @@
 #include "Thirdparty/Sophus/sophus/geometry.hpp"
 #include "Thirdparty/Sophus/sophus/sim3.hpp"
 
+#include <torch/torch.h>
+
 namespace ORB_SLAM3
 {
 
@@ -78,6 +80,16 @@ public:
     inline static float Focal2Fov(const float focal, const int pixels) {
         return 2 * std::atan(static_cast<float>(pixels) / (2.f * focal));
     }
+
+    // Gaussian related
+    inline static torch::Tensor InverseSigmoid(torch::Tensor x) {
+            return torch::log(x / (1 - x));
+        }
+    
+    inline static torch::Tensor RGB2SH(const torch::Tensor& rgb) {
+            const double C0 = 0.28209479177387814;
+            return (rgb - 0.5f) / static_cast<float>(C0);
+        }
 };
 
 }// namespace ORB_SLAM

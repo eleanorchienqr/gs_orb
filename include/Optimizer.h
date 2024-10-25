@@ -106,6 +106,10 @@ public:
                               const vector<MapGaussian *> &vpMG, int nIterations, bool* pbStopFlag, 
                               const unsigned long nLoopKF, const bool bRobust);
 
+    // GaussianCluster Optimization
+    void static GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale);
+    void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale);
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
 protected:

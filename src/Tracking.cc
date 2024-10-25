@@ -2624,8 +2624,11 @@ void Tracking::CreateInitialMapMonocular()
     #endif
 
     Optimizer::GlobalBundleAdjustemnt(mpAtlas->GetCurrentMap(),20);
+
+    #ifdef GAUSSIANSPLATTING
     // Gaussian Optimizer
-    Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200);
+    Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
+    #endif
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
     float invMedianDepth;
