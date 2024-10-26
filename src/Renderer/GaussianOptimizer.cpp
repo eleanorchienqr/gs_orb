@@ -6,6 +6,8 @@
 #include <memory>
 #include <cassert>
 
+#include <Thirdparty/simple-knn/spatial.h>
+
 namespace GaussianSplatting{
 
 float LossMonitor::Update(float newLoss) {
@@ -122,34 +124,108 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
 
 void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale)
 {
-    std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << vpMP.size() << std::endl;
+
+    const int FeaturestDim = std::pow(mSHDegree + 1, 2) - 1;
     
+    // Get Gaussian Data
+    mSizeofGaussians = 0;
+    for(int i = 0; i < vpMP.size(); i++)
+        mSizeofGaussians += vpMP[i]->GetGaussianNum();
+    
+    std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << mSizeofGaussians << std::endl;
+
+    mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mOpacity = torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mFeaturesDC = torch::zeros({mSizeofGaussians, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mFeaturesRest = torch::zeros({mSizeofGaussians, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+
+    mvpGaussianRootIndex = std::vector<long>(mSizeofGaussians, static_cast<long>(-1));
+    
+    int GaussianClusterIndex = 0;
+    for(int i = 0; i < vpMP.size(); i++)
+    {
+        ORB_SLAM3::MapPoint* pMP = vpMP[i];
+        if(pMP)
+        {
+            int GaussianClusterNum = pMP->GetGaussianNum();
+            
+            mMeans3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+            mOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
+            mScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
+            mRotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
+            mFeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
+            mFeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
+
+            for(int j = 0; j < GaussianClusterNum; j++)
+                mvpGaussianRootIndex[GaussianClusterIndex + j] = i;
+
+            GaussianClusterIndex += GaussianClusterNum;
+        }
+    }
+
     if(bInitializeScale) 
     {
-        // Get Gaussian Data
-        mSizeofGaussians = 0;
-        // for(int i = 0; i < vpMP.size(); i++)
-        //     mSizeofGaussians += vpMP[i]->GetGaussianNum();
-
-        // mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-        // mOpacity = torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-        // mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-        // mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-        // torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    
-        // mvpGaussianRootIndex = std::vector<long>(mSizeofGaussians, static_cast<long>(-1));
-        
-        // for(int i = 0; i < vpMP.size(); i++)
-        // {
-
-        // }
+        torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
+        mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
     }
-    
+
+    mMeans3D.set_requires_grad(true);
+    mOpacity.set_requires_grad(true);
+    mScales.set_requires_grad(true);
+    mRotation.set_requires_grad(true);
+    mFeaturesDC.set_requires_grad(true);
+    mFeaturesRest.set_requires_grad(true);
+
+    std::cout << "[InitializeOptimization] mSizeofGaussians: " << mSizeofGaussians << std::endl;
+
+    // Get Camera and Image Data
+    mSizeofCameras = vpKFs.size();
+    vpKFs[0]->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
+    mProjMatrix = SetProjMatrix();
+
+    std::cout << "[GaussianSplatting::Optimize] mSizeofCameras: " << mSizeofCameras << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mImHeight: " << mImHeight << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mImWidth: " << mImWidth << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mTanFovx: " << mTanFovx << std::endl;
+    std::cout << "[GaussianSplatting::Optimize] mTanFovy: " << mTanFovy << std::endl;
+
+    for(size_t i=0; i<vpKFs.size(); i++)
+    {
+        ORB_SLAM3::KeyFrame* pKF = vpKFs[i];
+        if(pKF->isBad())
+            continue;
+        Sophus::SE3f Tcw = pKF->GetPose();
+        torch::Tensor ViewMatrix = GetViewMatrix(Tcw);
+        torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0);
+        torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
+
+        mTrainedImages.push_back(pKF->mIm);
+        torch::Tensor TrainedImageTensor = CVMatToTensor(pKF->mIm);
+        mTrainedImagesTensor.push_back(TrainedImageTensor.to(torch::kCUDA)); // 1.0 / 225.
+
+        mViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
+        mProjMatrices.push_back(FullProjMatrix.to(torch::kCUDA));
+        mCameraCenters.push_back(CamCenter.to(torch::kCUDA));
+
+        std::cout << "[GaussianSplatting::Optimize] ViewMatrix: " << i << ", " << mViewMatrices[i] << std::endl;
+        std::cout << "[GaussianSplatting::Optimize] ProjMatrix: " << i << ", " << mProjMatrices[i] << std::endl;
+    }
+
+    // Calculate cameras associated members for densification
+    auto [mNerfNormTranslation, mNerfNormRadius] = GetNerfppNorm();
+
+    // Setup Optimizer
+    TrainingSetup();
+    // Setup Loss Monitor
+    mLossMonitor = new GaussianSplatting::LossMonitor(200);
+    mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
 }
 
 void GaussianOptimizer::Optimize()
 {
-    std::cout << "[GaussianOptimizer::Optimize] Start" << std::endl;
+    // std::cout << "[GaussianOptimizer::Optimize] Start" << std::endl;
 
     std::vector<int> CamIndices;
     int CamIndex = 0;
@@ -235,6 +311,8 @@ void GaussianOptimizer::Optimize()
             }
         }
     }
+
+    std::cout << "[AfterOptimization] mSizeofGaussians: " << mSizeofGaussians << std::endl;
 }
 
 void GaussianOptimizer::DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size) {
@@ -506,6 +584,47 @@ torch::Tensor GaussianOptimizer::GetCamCenterWithIndex(const int &CamIndex)
 torch::Tensor GaussianOptimizer::GetGTImgTensor(const int &CamIndex)
 {
     return mTrainedImagesTensor[CamIndex];
+}
+
+std::vector<long> GaussianOptimizer::GetGaussianRootIndex()
+{
+    return mvpGaussianRootIndex;
+}
+
+torch::Tensor GaussianOptimizer::GetWorldPos(const torch::Tensor indices)
+{
+    torch::Tensor SelectTensor = mMeans3D.index_select(0, indices);
+    return SelectTensor;
+}
+
+torch::Tensor GaussianOptimizer::GetWorldRot(const torch::Tensor indices)
+{
+    torch::Tensor SelectTensor = mRotation.index_select(0, indices);
+    return SelectTensor;
+}
+
+torch::Tensor GaussianOptimizer::GetScale(const torch::Tensor indices)
+{
+    torch::Tensor SelectTensor = mScales.index_select(0, indices);
+    return SelectTensor;
+}
+
+torch::Tensor GaussianOptimizer::GetOpacity(const torch::Tensor indices)
+{
+    torch::Tensor SelectTensor = mOpacity.index_select(0, indices);
+    return SelectTensor;
+}
+
+torch::Tensor GaussianOptimizer::GetFeaturest(const torch::Tensor indices)
+{
+    torch::Tensor SelectTensor = mFeaturesRest.index_select(0, indices);
+    return SelectTensor;
+}
+
+torch::Tensor GaussianOptimizer::GetFeatureDC(const torch::Tensor indices)
+{
+    torch::Tensor SelectTensor = mFeaturesDC.index_select(0, indices);
+    return SelectTensor;
 }
 
 torch::Tensor GaussianOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) {

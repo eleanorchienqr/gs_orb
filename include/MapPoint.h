@@ -120,8 +120,21 @@ public:
     void SetWorldPos(const Eigen::Vector3f &Pos);
     Eigen::Vector3f GetWorldPos();
 
-    // Gaussian Setter
+    // Gaussian Setters
     void InitializeGaussianCluster(const Eigen::Vector3f &Pos);
+    void ResetGauAttributes(const long GauNum);
+    void SettGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
+                           const torch::Tensor GauScale, const torch::Tensor GauOpacity, 
+                           const torch::Tensor GauFeaturest, const torch::Tensor GauFeatureDC);
+
+    // Gaussian Gettters
+    long unsigned int GetGaussianNum();
+    torch::Tensor GetGauWorldPos();
+    torch::Tensor GetGauWorldRot();
+    torch::Tensor GetGauScale();
+    torch::Tensor GetGauOpacity();
+    torch::Tensor GetGauFeatureDC();
+    torch::Tensor GetGauFeaturest();
 
     Eigen::Vector3f GetNormal();
     void SetNormalVector(const Eigen::Vector3f& normal);
@@ -219,15 +232,15 @@ public:
 protected:    
 
     // Gaussian Members, serialization ?
-    long unsigned int mGauNum = 1;
+    long unsigned int mGauNum = 0;
     long unsigned int mGauSHDegree = 3;
 
     torch::Tensor mGauWorldPos;            // {mGauNum, 3}
     torch::Tensor mGauWorldRot;            // {mGauNum, 4}
     torch::Tensor mGauScale;               // {mGauNum, 3}
     torch::Tensor mGauOpacity;             // {mGauNum, 1}
-    torch::Tensor mGauFeatureDC;           // {mGauNum, 3}
-    torch::Tensor mGauFeaturest;           // {mGauNum, (mSHDegree+1)**2 - 1}
+    torch::Tensor mGauFeatureDC;           // {mGauNum, 1, 3}
+    torch::Tensor mGauFeaturest;           // {mGauNum, (mSHDegree+1)**2 - 1, 3}
 
      // Position in absolute coordinates
      Eigen::Vector3f mWorldPos;

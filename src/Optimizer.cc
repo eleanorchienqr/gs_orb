@@ -5628,8 +5628,49 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
     ORB_SLAM3::OptimizationParameters OptimParams;
     GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
     optimizer.InitializeOptimizationUpdate(vpKFs, vpMP, bInitializeScale);
-    // optimizer.Optimize();
+    optimizer.Optimize();
 
+    // Recover optimized data
+    std::vector<long> vpGaussianRootIndex = optimizer.GetGaussianRootIndex();
+    std::vector<std::vector<long>> vpGaussianIndices(vpMP.size(), std::vector<long>(0));
+
+    for(int i = 0; i < vpGaussianRootIndex.size(); i++)
+    {
+        for(int j = 0; j < vpMP.size(); j++)
+        {
+            if(vpGaussianRootIndex[i] == j)
+                vpGaussianIndices[j].push_back(i); 
+        }
+    }
+
+    // std::cout << "[AfterOptimization::vpGaussianNum] " << vpGaussianNum << std::endl;
+    for(int i = 0; i < vpMP.size(); i++)
+    {
+        std::vector<long> vpGaussianIndex = vpGaussianIndices[i];
+        const long GauNum = vpGaussianIndex.size();
+
+        MapPoint* pMP = vpMP[i];
+
+        if(pMP)
+        {
+            pMP->ResetGauAttributes(GauNum);
+        
+            torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
+            if(GauNum)
+            {
+                // std::cout << "[AfterOptimization::MapPoint Index] " << i << " , GaussianIndex: " << vpGaussianIndexTensor << std::endl;
+                torch::Tensor GauWorldPos = optimizer.GetWorldPos(vpGaussianIndexTensor); 
+                torch::Tensor GauWorldRot = optimizer.GetWorldRot(vpGaussianIndexTensor); 
+                torch::Tensor GauScale = optimizer.GetScale(vpGaussianIndexTensor); 
+                torch::Tensor GauOpacity = optimizer.GetOpacity(vpGaussianIndexTensor); 
+                torch::Tensor GauFeaturest = optimizer.GetFeaturest(vpGaussianIndexTensor); 
+                torch::Tensor GauFeatureDC = optimizer.GetFeatureDC(vpGaussianIndexTensor); 
+
+                // std::cout << "[AfterOptimization:GauFeatureDC] " << GauFeatureDC << std::endl;
+                pMP->SettGauAttributes(GauWorldPos, GauWorldRot, GauScale, GauOpacity, GauFeaturest, GauFeatureDC);
+            }
+        }
+    }
 }
 
 } //namespace ORB_SLAM

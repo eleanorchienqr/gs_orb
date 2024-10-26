@@ -136,17 +136,94 @@ void MapPoint::InitializeGaussianCluster(const Eigen::Vector3f &Pos)
     const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
     Eigen::Vector3f PosTranspose = Pos.transpose();
-    mGauWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA);
+    mGauWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA, true);
     mGauWorldRot = torch::zeros({1, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
     mGauScale = torch::zeros({1, 3}).to(torch::kCUDA, true); // Leave scales later in Optimization
     mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({1, 1})).to(torch::kCUDA, true);
-    mGauFeatureDC = Converter::RGB2SH(torch::zeros({1, 3})).to(torch::kCUDA, true);
-    mGauFeaturest = torch::zeros({1, FeaturestDim}).to(torch::kCUDA, true);
+    mGauFeaturest = torch::zeros({1, FeaturestDim, 3}).to(torch::kCUDA, true);
+    mGauFeatureDC = Converter::RGB2SH(torch::zeros({1, 1, 3})).to(torch::kCUDA, true);
+    // torch::Tensor Features = torch::zeros({1, 3, static_cast<long>(std::pow((mGauSHDegree + 1), 2))});
+    // Features.index_put_({torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, 3), 0}, GauFeatureDC);
+    // Features.index_put_({torch::indexing::Slice(), torch::indexing::Slice(3, torch::indexing::None), torch::indexing::Slice(1, torch::indexing::None)}, 0.0);
 
+    // mGauFeatureDC = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 1)}).transpose(1, 2).contiguous().to(torch::kCUDA, true);
+    // mGauFeaturest = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None)}).transpose(1, 2).contiguous().to(torch::kCUDA, true);
+
+    mGauNum = 1;
     // std::cout << "[InitializeGaussianCluster] WorldPos of MapPoint: " << PosTranspose << std::endl;
     // std::cout << "[InitializeGaussianCluster] WorldPos of Gaussian: " << mGauWorldPos << std::endl;
-    // std::cout << "[InitializeGaussianCluster] mOpacity of Gaussian: " << mGauOpacity << std::endl;
+    // std::cout << "[InitializeGaussianCluster] mGauFeatureDC of Gaussian: " << mGauFeatureDC << std::endl;
+    // std::cout << "[InitializeGaussianCluster] mGauFeaturest of Gaussian: " << mGauFeaturest << std::endl;
     // std::cout << std:: endl;
+}
+
+void MapPoint::ResetGauAttributes(const long GauNum)
+{
+    if(GauNum)
+    {
+        const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
+        const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
+
+        mGauWorldPos = torch::zeros({GauNum, 3}).to(torch::kCUDA, true); 
+        mGauWorldRot = torch::zeros({GauNum, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
+        mGauScale = torch::zeros({GauNum, 3}).to(torch::kCUDA, true); // Leave scales later in Optimization
+        mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({GauNum, 1})).to(torch::kCUDA, true);
+        mGauFeaturest = torch::zeros({GauNum, FeaturestDim, 3}).to(torch::kCUDA, true);
+        mGauFeatureDC = Converter::RGB2SH(torch::zeros({GauNum, 1, 3})).to(torch::kCUDA, true);
+        mGauNum = GauNum;
+    }
+    else
+    {
+        mGauNum = 0;
+    }
+    
+}
+
+void MapPoint::SettGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
+                                 const torch::Tensor GauScale, const torch::Tensor GauOpacity, 
+                                 const torch::Tensor GauFeaturest, const torch::Tensor GauFeatureDC)
+{
+    mGauWorldPos = GauWorldPos; 
+    mGauWorldRot = GauWorldRot;
+    mGauScale = GauScale; // Leave scales later in Optimization
+    mGauOpacity = GauOpacity;
+    mGauFeaturest = GauFeaturest;
+    mGauFeatureDC = GauFeatureDC;
+}
+
+long unsigned int MapPoint::GetGaussianNum()
+{
+    return mGauNum;
+}
+
+torch::Tensor MapPoint::GetGauWorldPos()
+{
+    return mGauWorldPos;
+}
+
+torch::Tensor MapPoint::GetGauWorldRot()
+{
+    return mGauWorldRot;
+}
+
+torch::Tensor MapPoint::GetGauScale()
+{
+    return mGauScale;
+}
+
+torch::Tensor MapPoint::GetGauOpacity()
+{
+    return mGauOpacity;
+}
+
+torch::Tensor MapPoint::GetGauFeatureDC()
+{
+    return mGauFeatureDC;
+}
+
+torch::Tensor MapPoint::GetGauFeaturest()
+{
+    return mGauFeaturest;
 }
 
 Eigen::Vector3f MapPoint::GetNormal() {

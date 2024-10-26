@@ -117,7 +117,6 @@ public:
     void TrainingSetup();
     void Optimize();
 
-
     // Camera params
     std::pair<torch::Tensor, float> GetNerfppNorm();
     std::pair<torch::Tensor, float> GetCenterAndDiag();
@@ -131,6 +130,15 @@ public:
     torch::Tensor GetProjMatrixWithIndex(const int &CamIndex);
     torch::Tensor GetCamCenterWithIndex(const int &CamIndex);
     torch::Tensor GetGTImgTensor(const int &CamIndex);
+
+    std::vector<long> GetGaussianRootIndex();
+
+    torch::Tensor GetWorldPos(const torch::Tensor indices);
+    torch::Tensor GetWorldRot(const torch::Tensor indices);
+    torch::Tensor GetScale(const torch::Tensor indices);
+    torch::Tensor GetOpacity(const torch::Tensor indices);
+    torch::Tensor GetFeaturest(const torch::Tensor indices);
+    torch::Tensor GetFeatureDC(const torch::Tensor indices);
 
     // Converter
     torch::Tensor CVMatToTensor(cv::Mat mat);
