@@ -123,9 +123,10 @@ public:
     // Gaussian Setters
     void InitializeGaussianCluster(const Eigen::Vector3f &Pos);
     void ResetGauAttributes(const long GauNum);
-    void SettGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
+    void SetGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
                            const torch::Tensor GauScale, const torch::Tensor GauOpacity, 
                            const torch::Tensor GauFeaturest, const torch::Tensor GauFeatureDC);
+    void SetGauWorldPos(float invMedianDepth);
 
     // Gaussian Gettters
     long unsigned int GetGaussianNum();
@@ -241,6 +242,9 @@ protected:
     torch::Tensor mGauOpacity;             // {mGauNum, 1}
     torch::Tensor mGauFeatureDC;           // {mGauNum, 1, 3}
     torch::Tensor mGauFeaturest;           // {mGauNum, (mSHDegree+1)**2 - 1, 3}
+
+    // Mutex
+     std::mutex mMutexGau;
 
      // Position in absolute coordinates
      Eigen::Vector3f mWorldPos;

@@ -5665,12 +5665,53 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
                 torch::Tensor GauOpacity = optimizer.GetOpacity(vpGaussianIndexTensor); 
                 torch::Tensor GauFeaturest = optimizer.GetFeaturest(vpGaussianIndexTensor); 
                 torch::Tensor GauFeatureDC = optimizer.GetFeatureDC(vpGaussianIndexTensor); 
-
                 // std::cout << "[AfterOptimization:GauFeatureDC] " << GauFeatureDC << std::endl;
-                pMP->SettGauAttributes(GauWorldPos, GauWorldRot, GauScale, GauOpacity, GauFeaturest, GauFeatureDC);
+                pMP->SetGauAttributes(GauWorldPos, GauWorldRot, GauScale, GauOpacity, GauFeaturest, GauFeatureDC);
             }
         }
     }
+}
+
+void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
+{
+    // Local KeyFrames: First Breath Search from Current Keyframe
+    list<KeyFrame*> lLocalKeyFrames;
+    lLocalKeyFrames.push_back(pKF);
+    Map* pCurrentMap = pKF->GetMap();
+
+    const vector<KeyFrame*> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
+    for(int i=0, iend=vNeighKFs.size(); i<iend; i++)
+    {
+        KeyFrame* pKFi = vNeighKFs[i];
+        if(!pKFi->isBad() && pKFi->GetMap() == pCurrentMap)
+            lLocalKeyFrames.push_back(pKFi);
+    }
+
+    // Local MapPoints and Gaussians seen in Local KeyFrames
+    list<MapPoint*> lLocalMapPoints;
+    set<MapPoint*> sNumObsMP;
+    for(list<KeyFrame*>::iterator lit=lLocalKeyFrames.begin() , lend=lLocalKeyFrames.end(); lit!=lend; lit++)
+    {
+        KeyFrame* pKFi = *lit;
+        vector<MapPoint*> vpMPs = pKFi->GetMapPointMatches();
+        for(vector<MapPoint*>::iterator vit=vpMPs.begin(), vend=vpMPs.end(); vit!=vend; vit++)
+        {
+            MapPoint* pMP = *vit;
+            if(pMP)
+                if(!pMP->isBad() && pMP->GetMap() == pCurrentMap)
+                {
+                    // Get Correspondng Gaussians
+                }
+        }
+    }
+
+    // Setup optimizer
+
+    // Optimize
+
+    // AfterOptimize
+
+
 }
 
 } //namespace ORB_SLAM

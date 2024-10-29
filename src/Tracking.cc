@@ -1949,10 +1949,12 @@ void Tracking::Track()
             {
 
                 // Local Mapping might have changed some MapPoints tracked in last frame
+                // std::cout << ">>>>>>>>>>>>MapPoint Operation Test<<<<<<<<<<<<<" << std::endl;
                 CheckReplacedInLastFrame();
 
                 if((!mbVelocity && !pCurrentMap->isImuInitialized()) || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                 {
+                    // std::cout << ">>>>>>>>>>>>MapPoint Operation Test<<<<<<<<<<<<<" << std::endl;
                     Verbose::PrintMess("TRACK: Track with respect to the reference KF ", Verbose::VERBOSITY_DEBUG);
                     bOK = TrackReferenceKeyFrame();
                 }
@@ -2058,6 +2060,7 @@ void Tracking::Track()
                     // In last frame we tracked enough MapPoints in the map
                     if(mbVelocity)
                     {
+                        // std::cout << ">>>>>>>>>>>>MapPoint Operation Test<<<<<<<<<<<<<" << std::endl;
                         bOK = TrackWithMotionModel();
                     }
                     else
@@ -2664,12 +2667,9 @@ void Tracking::CreateInitialMapMonocular()
             MapPoint* pMP = vpAllMapPoints[iMP];
             pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
             pMP->UpdateNormalAndDepth();
-
-            // #ifdef GAUSSIANSPLATTING
-            // iMG++;
-            // MapGaussian* pMG = vpAllMapGaussians[iMG];
-            // pMG->SetWorldPos(pMP->GetWorldPos());
-            // #endif
+            #ifdef GAUSSIANSPLATTING
+            pMP->SetGauWorldPos(invMedianDepth);
+            #endif
         }
     }
 

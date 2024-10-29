@@ -159,6 +159,11 @@ void LocalMapping::Run()
                     else
                     {
                         Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpCurrentKeyFrame->GetMap(),num_FixedKF_BA,num_OptKF_BA,num_MPs_BA,num_edges_BA);
+                        
+                        #ifdef GAUSSIANSPLATTING
+                        Optimizer::LocalGaussianOptimization(mpCurrentKeyFrame, mpCurrentKeyFrame->GetMap());
+                        #endif
+                        
                         b_doneLBA = true;
                     }
 

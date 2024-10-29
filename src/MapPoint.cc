@@ -87,6 +87,10 @@ MapPoint::MapPoint(const Eigen::Vector3f &Pos, Map* pMap, Frame* pFrame, const i
 {
     SetWorldPos(Pos);
 
+    #ifdef GAUSSIANSPLATTING
+    InitializeGaussianCluster(Pos);
+    #endif
+
     Eigen::Vector3f Ow;
     if(pFrame -> Nleft == -1 || idxF < pFrame -> Nleft){
         Ow = pFrame->GetCameraCenter();
@@ -179,7 +183,15 @@ void MapPoint::ResetGauAttributes(const long GauNum)
     
 }
 
-void MapPoint::SettGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
+void MapPoint::SetGauWorldPos(float invMedianDepth)
+{
+    unique_lock<mutex> lock2(mGlobalMutex);
+    unique_lock<mutex> lock(mMutexGau);
+    torch::Tensor GauWorldPos = mGauWorldPos * invMedianDepth;
+    mGauWorldPos = GauWorldPos;
+}
+
+void MapPoint::SetGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
                                  const torch::Tensor GauScale, const torch::Tensor GauOpacity, 
                                  const torch::Tensor GauFeaturest, const torch::Tensor GauFeatureDC)
 {

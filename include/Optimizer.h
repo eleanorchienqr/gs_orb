@@ -109,6 +109,7 @@ public:
     // GaussianCluster Optimization
     void static GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale);
     void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale);
+    void static LocalGaussianOptimization(KeyFrame* pKF, Map *pMap);
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
