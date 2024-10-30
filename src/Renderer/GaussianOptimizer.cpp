@@ -147,21 +147,26 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
     for(int i = 0; i < vpMP.size(); i++)
     {
         ORB_SLAM3::MapPoint* pMP = vpMP[i];
+
         if(pMP)
         {
             int GaussianClusterNum = pMP->GetGaussianNum();
             
-            mMeans3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
-            mOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
-            mScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
-            mRotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
-            mFeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
-            mFeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
+            if(GaussianClusterNum)
+            {
+                mMeans3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+                mOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
+                mScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
+                mRotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
+                mFeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
+                mFeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
 
-            for(int j = 0; j < GaussianClusterNum; j++)
-                mvpGaussianRootIndex[GaussianClusterIndex + j] = i;
+                for(int j = 0; j < GaussianClusterNum; j++)
+                    mvpGaussianRootIndex[GaussianClusterIndex + j] = i;
 
-            GaussianClusterIndex += GaussianClusterNum;
+                GaussianClusterIndex += GaussianClusterNum;
+            }
+            
         }
     }
 
@@ -257,7 +262,7 @@ void GaussianOptimizer::Optimize()
             .prefiltered = mPrefiltered};
 
         // Tensors setup
-        auto Means2D = torch::zeros_like(mMeans3D).requires_grad_(true);
+        torch::Tensor Means2D = torch::zeros_like(mMeans3D).to(torch::kCUDA).requires_grad_(true);
         Means2D.retain_grad();
         torch::Tensor Cov3DPrecomp = torch::Tensor();
         torch::Tensor ColorsPrecomp = torch::Tensor();
@@ -268,11 +273,11 @@ void GaussianOptimizer::Optimize()
         auto [rendererd_image, radii] = rasterizer.forward(
             mMeans3D,
             Means2D,
-            torch::sigmoid(mOpacity),
+            torch::sigmoid(mOpacity).to(torch::kCUDA),
             torch::cat({mFeaturesDC, mFeaturesRest}, 1).to(torch::kCUDA),
             ColorsPrecomp,
-            torch::exp(mScales),
-            torch::nn::functional::normalize(mRotation),
+            torch::exp(mScales).to(torch::kCUDA),
+            torch::nn::functional::normalize(mRotation).to(torch::kCUDA),
             Cov3DPrecomp);
 
         // Loss Computations
@@ -695,7 +700,8 @@ void GaussianOptimizer::TrainingSetup()
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[4].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[5].options()).eps(1e-15);
 
-    mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups Check" << mOpacity << std::endl;
+    mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));  
 }
 
 std::pair<torch::Tensor, float> GaussianOptimizer::GetNerfppNorm() {

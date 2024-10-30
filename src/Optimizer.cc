@@ -5675,7 +5675,7 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
 void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
 {
     // Local KeyFrames: First Breath Search from Current Keyframe
-    list<KeyFrame*> lLocalKeyFrames;
+    std::vector<KeyFrame*> lLocalKeyFrames;
     lLocalKeyFrames.push_back(pKF);
     Map* pCurrentMap = pKF->GetMap();
 
@@ -5688,30 +5688,23 @@ void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
     }
 
     // Local MapPoints and Gaussians seen in Local KeyFrames
-    list<MapPoint*> lLocalMapPoints;
-    set<MapPoint*> sNumObsMP;
-    for(list<KeyFrame*>::iterator lit=lLocalKeyFrames.begin() , lend=lLocalKeyFrames.end(); lit!=lend; lit++)
+    std::vector<MapPoint*> lLocalMapPoints;
+    for(int i = 0; i < lLocalKeyFrames.size(); i++)
     {
-        KeyFrame* pKFi = *lit;
+        KeyFrame* pKFi = lLocalKeyFrames[i];
         vector<MapPoint*> vpMPs = pKFi->GetMapPointMatches();
         for(vector<MapPoint*>::iterator vit=vpMPs.begin(), vend=vpMPs.end(); vit!=vend; vit++)
         {
             MapPoint* pMP = *vit;
             if(pMP)
+            {
                 if(!pMP->isBad() && pMP->GetMap() == pCurrentMap)
-                {
-                    // Get Correspondng Gaussians
-                }
+                    lLocalMapPoints.push_back(pMP);
+            }
         }
     }
 
-    // Setup optimizer
-
-    // Optimize
-
-    // AfterOptimize
-
-
+    GaussianOptimization(lLocalKeyFrames, lLocalMapPoints, 200, false);
 }
 
 } //namespace ORB_SLAM
