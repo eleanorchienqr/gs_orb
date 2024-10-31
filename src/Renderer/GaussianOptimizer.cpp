@@ -129,8 +129,11 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
     
     // Get Gaussian Data
     mSizeofGaussians = 0;
-    for(int i = 0; i < vpMP.size(); i++)
-        mSizeofGaussians += vpMP[i]->GetGaussianNum();
+    for(int i = 0; i < vpMP.size(); i++){
+        ORB_SLAM3::MapPoint* pMP = vpMP[i];
+        if(pMP)
+            mSizeofGaussians += pMP->GetGaussianNum();
+    }
     
     std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << mSizeofGaussians << std::endl;
 
@@ -154,6 +157,9 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
             
             if(GaussianClusterNum)
             {
+                // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
+                // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
+                // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
                 mMeans3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
                 mOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
                 mScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
@@ -170,18 +176,25 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
         }
     }
 
+    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mFeaturesDC Check " << mFeaturesDC.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mFeaturesRest Check " << mFeaturesRest.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mScales Check " << mScales.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mRotation Check " << mRotation.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mOpacity Check " << mOpacity.is_leaf() << std::endl;
+
     if(bInitializeScale) 
     {
         torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
         mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
     }
 
-    mMeans3D.set_requires_grad(true);
-    mOpacity.set_requires_grad(true);
-    mScales.set_requires_grad(true);
-    mRotation.set_requires_grad(true);
-    mFeaturesDC.set_requires_grad(true);
-    mFeaturesRest.set_requires_grad(true);
+    // mMeans3D.set_requires_grad(true);
+    // mOpacity.set_requires_grad(true);
+    // mScales.set_requires_grad(true);
+    // mRotation.set_requires_grad(true);
+    // mFeaturesDC.set_requires_grad(true);
+    // mFeaturesRest.set_requires_grad(true);
 
     std::cout << "[InitializeOptimization] mSizeofGaussians: " << mSizeofGaussians << std::endl;
 
@@ -599,37 +612,37 @@ std::vector<long> GaussianOptimizer::GetGaussianRootIndex()
 torch::Tensor GaussianOptimizer::GetWorldPos(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mMeans3D.index_select(0, indices);
-    return SelectTensor;
+    return SelectTensor.clone();
 }
 
 torch::Tensor GaussianOptimizer::GetWorldRot(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mRotation.index_select(0, indices);
-    return SelectTensor;
+    return SelectTensor.clone();
 }
 
 torch::Tensor GaussianOptimizer::GetScale(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mScales.index_select(0, indices);
-    return SelectTensor;
+    return SelectTensor.clone();
 }
 
 torch::Tensor GaussianOptimizer::GetOpacity(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mOpacity.index_select(0, indices);
-    return SelectTensor;
+    return SelectTensor.clone();
 }
 
 torch::Tensor GaussianOptimizer::GetFeaturest(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mFeaturesRest.index_select(0, indices);
-    return SelectTensor;
+    return SelectTensor.clone();
 }
 
 torch::Tensor GaussianOptimizer::GetFeatureDC(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mFeaturesDC.index_select(0, indices);
-    return SelectTensor;
+    return SelectTensor.clone();
 }
 
 torch::Tensor GaussianOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) {
@@ -684,6 +697,13 @@ void GaussianOptimizer::TrainingSetup()
                                                          mOptimParams.position_lr_delay_mult,
                                                          mOptimParams.position_lr_max_steps  );
 
+    mMeans3D.set_requires_grad(true);
+    mOpacity.set_requires_grad(true);
+    mScales.set_requires_grad(true);
+    mRotation.set_requires_grad(true);
+    mFeaturesDC.set_requires_grad(true);
+    mFeaturesRest.set_requires_grad(true);
+
     std::vector<torch::optim::OptimizerParamGroup> OptimizerParamsGroups;
     OptimizerParamsGroups.reserve(6);
     OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mMeans3D}, std::make_unique<torch::optim::AdamOptions>(mOptimParams.position_lr_init * mSpatialLRScale)));
@@ -700,7 +720,13 @@ void GaussianOptimizer::TrainingSetup()
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[4].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[5].options()).eps(1e-15);
 
-    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups Check" << mOpacity << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mFeaturesDC Check " << mFeaturesDC.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mFeaturesRest Check " << mFeaturesRest.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mScales Check " << mScales.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mRotation Check " << mRotation.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mOpacity Check " << mOpacity.is_leaf() << std::endl;
+
     mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));  
 }
 

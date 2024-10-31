@@ -5653,11 +5653,10 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
 
         if(pMP)
         {
-            pMP->ResetGauAttributes(GauNum);
-        
-            torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
             if(GauNum)
             {
+                pMP->ResetGauAttributes(GauNum);
+                torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
                 // std::cout << "[AfterOptimization::MapPoint Index] " << i << " , GaussianIndex: " << vpGaussianIndexTensor << std::endl;
                 torch::Tensor GauWorldPos = optimizer.GetWorldPos(vpGaussianIndexTensor); 
                 torch::Tensor GauWorldRot = optimizer.GetWorldRot(vpGaussianIndexTensor); 
@@ -5667,6 +5666,10 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
                 torch::Tensor GauFeatureDC = optimizer.GetFeatureDC(vpGaussianIndexTensor); 
                 // std::cout << "[AfterOptimization:GauFeatureDC] " << GauFeatureDC << std::endl;
                 pMP->SetGauAttributes(GauWorldPos, GauWorldRot, GauScale, GauOpacity, GauFeaturest, GauFeatureDC);
+            }
+            else
+            {
+                pMP->InitializeGaussianCluster(pMP->GetWorldPos());
             }
         }
     }
@@ -5679,13 +5682,13 @@ void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
     lLocalKeyFrames.push_back(pKF);
     Map* pCurrentMap = pKF->GetMap();
 
-    const vector<KeyFrame*> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
-    for(int i=0, iend=vNeighKFs.size(); i<iend; i++)
-    {
-        KeyFrame* pKFi = vNeighKFs[i];
-        if(!pKFi->isBad() && pKFi->GetMap() == pCurrentMap)
-            lLocalKeyFrames.push_back(pKFi);
-    }
+    // const vector<KeyFrame*> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
+    // for(int i=0, iend=vNeighKFs.size(); i<iend; i++)
+    // {
+    //     KeyFrame* pKFi = vNeighKFs[i];
+    //     if(!pKFi->isBad() && pKFi->GetMap() == pCurrentMap)
+    //         lLocalKeyFrames.push_back(pKFi);
+    // }
 
     // Local MapPoints and Gaussians seen in Local KeyFrames
     std::vector<MapPoint*> lLocalMapPoints;

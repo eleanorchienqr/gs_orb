@@ -163,17 +163,19 @@ void MapPoint::InitializeGaussianCluster(const Eigen::Vector3f &Pos)
 
 void MapPoint::ResetGauAttributes(const long GauNum)
 {
+    unique_lock<mutex> lock2(mGlobalMutex);
+    unique_lock<mutex> lock(mMutexGau);
     if(GauNum)
     {
         const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
         const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
-        mGauWorldPos = torch::zeros({GauNum, 3}).to(torch::kCUDA, true); 
-        mGauWorldRot = torch::zeros({GauNum, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
-        mGauScale = torch::zeros({GauNum, 3}).to(torch::kCUDA, true); // Leave scales later in Optimization
-        mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({GauNum, 1})).to(torch::kCUDA, true);
-        mGauFeaturest = torch::zeros({GauNum, FeaturestDim, 3}).to(torch::kCUDA, true);
-        mGauFeatureDC = Converter::RGB2SH(torch::zeros({GauNum, 1, 3})).to(torch::kCUDA, true);
+        mGauWorldPos = torch::zeros({GauNum, 3}).to(torch::kCUDA); 
+        mGauWorldRot = torch::zeros({GauNum, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA);
+        mGauScale = torch::zeros({GauNum, 3}).to(torch::kCUDA); // Leave scales later in Optimization
+        mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({GauNum, 1})).to(torch::kCUDA);
+        mGauFeaturest = torch::zeros({GauNum, FeaturestDim, 3}).to(torch::kCUDA);
+        mGauFeatureDC = Converter::RGB2SH(torch::zeros({GauNum, 1, 3})).to(torch::kCUDA);
         mGauNum = GauNum;
     }
     else
@@ -187,55 +189,66 @@ void MapPoint::SetGauWorldPos(float invMedianDepth)
 {
     unique_lock<mutex> lock2(mGlobalMutex);
     unique_lock<mutex> lock(mMutexGau);
+
     torch::Tensor GauWorldPos = mGauWorldPos * invMedianDepth;
-    mGauWorldPos = GauWorldPos;
+    mGauWorldPos = GauWorldPos.to(torch::kCUDA, true);
 }
 
 void MapPoint::SetGauAttributes(const torch::Tensor GauWorldPos, const torch::Tensor GauWorldRot, 
                                  const torch::Tensor GauScale, const torch::Tensor GauOpacity, 
                                  const torch::Tensor GauFeaturest, const torch::Tensor GauFeatureDC)
 {
-    mGauWorldPos = GauWorldPos; 
-    mGauWorldRot = GauWorldRot;
-    mGauScale = GauScale; // Leave scales later in Optimization
-    mGauOpacity = GauOpacity;
-    mGauFeaturest = GauFeaturest;
-    mGauFeatureDC = GauFeatureDC;
+    unique_lock<mutex> lock2(mGlobalMutex);
+    unique_lock<mutex> lock(mMutexGau);
+
+    mGauWorldPos = GauWorldPos.clone().to(torch::kCUDA); 
+    mGauWorldRot = GauWorldRot.clone().to(torch::kCUDA);
+    mGauScale = GauScale.clone().to(torch::kCUDA); // Leave scales later in Optimization
+    mGauOpacity = GauOpacity.clone().to(torch::kCUDA);
+    mGauFeaturest = GauFeaturest.clone().to(torch::kCUDA);
+    mGauFeatureDC = GauFeatureDC.clone().to(torch::kCUDA);
 }
 
 long unsigned int MapPoint::GetGaussianNum()
 {
+    unique_lock<mutex> lock(mMutexGau);
     return mGauNum;
 }
 
 torch::Tensor MapPoint::GetGauWorldPos()
 {
-    return mGauWorldPos;
+    unique_lock<mutex> lock(mMutexGau);
+    return mGauWorldPos.clone();
 }
 
 torch::Tensor MapPoint::GetGauWorldRot()
 {
-    return mGauWorldRot;
+    unique_lock<mutex> lock(mMutexGau);
+    return mGauWorldRot.clone();
 }
 
 torch::Tensor MapPoint::GetGauScale()
 {
-    return mGauScale;
+    unique_lock<mutex> lock(mMutexGau);
+    return mGauScale.clone();
 }
 
 torch::Tensor MapPoint::GetGauOpacity()
 {
-    return mGauOpacity;
+    unique_lock<mutex> lock(mMutexGau);
+    return mGauOpacity.clone();
 }
 
 torch::Tensor MapPoint::GetGauFeatureDC()
 {
-    return mGauFeatureDC;
+    unique_lock<mutex> lock(mMutexGau);
+    return mGauFeatureDC.clone();
 }
 
 torch::Tensor MapPoint::GetGauFeaturest()
 {
-    return mGauFeaturest;
+    unique_lock<mutex> lock(mMutexGau);
+    return mGauFeaturest.clone();
 }
 
 Eigen::Vector3f MapPoint::GetNormal() {
