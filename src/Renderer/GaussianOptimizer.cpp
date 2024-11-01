@@ -145,57 +145,45 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
     mFeaturesRest = torch::zeros({mSizeofGaussians, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
 
     mvpGaussianRootIndex = std::vector<long>(mSizeofGaussians, static_cast<long>(-1));
-    
-    int GaussianClusterIndex = 0;
-    for(int i = 0; i < vpMP.size(); i++)
+
     {
-        ORB_SLAM3::MapPoint* pMP = vpMP[i];
-
-        if(pMP)
+        torch::NoGradGuard no_grad;
+        int GaussianClusterIndex = 0;
+        for(int i = 0; i < vpMP.size(); i++)
         {
-            int GaussianClusterNum = pMP->GetGaussianNum();
-            
-            if(GaussianClusterNum)
+            ORB_SLAM3::MapPoint* pMP = vpMP[i];
+            if(pMP)
             {
-                // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
-                // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
-                // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
-                mMeans3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
-                mOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
-                mScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
-                mRotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
-                mFeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
-                mFeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
+                int GaussianClusterNum = pMP->GetGaussianNum();
+                if(GaussianClusterNum)
+                {
+                    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
+                    // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
+                    // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
+                    mMeans3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+                    mOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
+                    mScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
+                    mRotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
+                    mFeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
+                    mFeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
 
-                for(int j = 0; j < GaussianClusterNum; j++)
-                    mvpGaussianRootIndex[GaussianClusterIndex + j] = i;
+                    for(int j = 0; j < GaussianClusterNum; j++)
+                        mvpGaussianRootIndex[GaussianClusterIndex + j] = i;
 
-                GaussianClusterIndex += GaussianClusterNum;
+                    GaussianClusterIndex += GaussianClusterNum;
+                }
+                
             }
-            
         }
     }
-
-    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
-    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mFeaturesDC Check " << mFeaturesDC.is_leaf() << std::endl;
-    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mFeaturesRest Check " << mFeaturesRest.is_leaf() << std::endl;
-    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mScales Check " << mScales.is_leaf() << std::endl;
-    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mRotation Check " << mRotation.is_leaf() << std::endl;
-    // std::cout << "[GaussianSplatting::InitializeOptimization] OptimizerParamsGroups mOpacity Check " << mOpacity.is_leaf() << std::endl;
+    
 
     if(bInitializeScale) 
     {
         torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
         mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
     }
-
-    // mMeans3D.set_requires_grad(true);
-    // mOpacity.set_requires_grad(true);
-    // mScales.set_requires_grad(true);
-    // mRotation.set_requires_grad(true);
-    // mFeaturesDC.set_requires_grad(true);
-    // mFeaturesRest.set_requires_grad(true);
-
+    
     std::cout << "[InitializeOptimization] mSizeofGaussians: " << mSizeofGaussians << std::endl;
 
     // Get Camera and Image Data
