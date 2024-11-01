@@ -2,7 +2,6 @@
 #include <deque>
 
 #include "Config.h"
-#include "MapGaussian.h"
 #include "KeyFrame.h"
 
 namespace GaussianSplatting{
@@ -50,69 +49,12 @@ private:
     size_t _buffer_size;
 };
 
-// // Indice tree
-// class GaussianIndiceNode{
-
-// public:
-
-// // Constructor for non root nodes
-// GaussianIndiceNode(int Indice, int RootIndex):mIndice(Indice), mRootIndex(RootIndex){
-//     mChildrenIndices = std::vector<int>(mMaxChildNum); 
-// }
-// //Constructor for roots
-// GaussianIndiceNode(int Indice, bool IsRoot):mIndice(Indice), mIsRoot(IsRoot){
-//     mChildrenIndices = std::vector<int>(mMaxChildNum); 
-//     mRootIndex = Indice;
-// }
-
-// // void AddChildIndex(GaussianIndiceNode* newGaussian);
-// // void DeleteChild(GaussianIndiceNode* newGaussian);
-// // void SetInactiveState(GaussianIndiceNode* newGaussian);
-
-// private:
-//     int mIndice;            // Index for indexing Gaussians
-//     int mMaxChildNum = 5;   // Maximum children numbers
-//     int mChildNum = 0;      // Non-NULL number of children
-//     bool mActive = true;    // Change only for root
-//     std::vector<int> mChildrenIndices;
-//     // std::vector<GaussianIndiceNode*> mChildren;
-
-//     // MapGaussianNode* AddChild(MapGaussian* newData){
-//     //     MapGaussianNode*  newNode = new MapGaussianNode(newData);
-//     //     for(int i = 0; i<ChildNum; i++){
-//     //         if(children[i] == NULL){
-//     //             children[i] = newNode;
-//     //             break;
-//     //         }
-//     //     }
-//     //     return newNode;
-//     // }
-// public:
-//     bool mIsRoot = false;
-//     int mRootIndex;         // Index of root node
-// };
-
-// class GaussianIndiceTree
-// {
-//     private:
-//         GaussianIndiceNode* mRroot;
-    
-//     public:
-//         GaussianIndiceTree():mRroot(NULL){}
-//         GaussianIndiceTree(int Indice, bool IsRoot = true):mRroot(new GaussianIndiceNode(Indice, IsRoot)){}
-//         ~GaussianIndiceTree(){ delete mRroot; }
-        
-//         GaussianIndiceNode* GetRoot(){ return mRroot; }
-// };
-
-
 class GaussianOptimizer
 {
 public:
     // constructer
     GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &OptimParams);
 
-    void InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapGaussian *> &vpMG);
     void InitializeOptimizationUpdate(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale);
     void TrainingSetup();
     void Optimize();

@@ -57,7 +57,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
     mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
     mnMaxY(F.mnMaxY), mK_(F.mK_), mPrevKF(NULL), mNextKF(NULL), mpImuPreintegrated(F.mpImuPreintegrated),
-    mImuCalib(F.mImuCalib), mvpMapPoints(F.mvpMapPoints), mvpMapGaussianForest(F.mvpMapGaussianForest),mpKeyFrameDB(pKFDB),
+    mImuCalib(F.mImuCalib), mvpMapPoints(F.mvpMapPoints),mpKeyFrameDB(pKFDB),
     mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mDistCoef(F.mDistCoef), mbNotErase(false), mnDataset(F.mnDataset),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap), mbCurrentPlaceRecognition(false), mNameFile(F.mNameFile), mnMergeCorrectedForKF(0),
     mpCamera(F.mpCamera), mpCamera2(F.mpCamera2),
@@ -307,12 +307,6 @@ void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
     mvpMapPoints[idx]=pMP;
 }
 
-void KeyFrame::AddMapGaussianTree(MapGaussianTree *pMGT, const size_t &idx)
-{
-    unique_lock<mutex> lock(mMutexFeatures);
-    mvpMapGaussianForest[idx]=pMGT;
-}
-
 void KeyFrame::EraseMapPointMatch(const int &idx)
 {
     unique_lock<mutex> lock(mMutexFeatures);
@@ -383,23 +377,6 @@ vector<MapPoint*> KeyFrame::GetMapPointMatches()
     return mvpMapPoints;
 }
 
-std::vector<MapGaussian*> KeyFrame::GetMapGaussians()
-{
-    unique_lock<mutex> lock(mMutexGaussians);
-    std::vector<MapGaussian*> AllMapGaussians;
-
-    for(size_t i=0; i<mvpMapGaussianForest.size(); i++)
-    {
-        MapGaussianTree* GaussianTree = mvpMapGaussianForest[i];
-        if (GaussianTree)
-        {
-            MapGaussian* pMG = GaussianTree->GetRoot()->data;
-            AllMapGaussians.push_back(pMG);
-        }
-    }
-    return AllMapGaussians;
-}
-
 void KeyFrame::GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy)
 {
     ImWidth = mIm.cols;
@@ -407,36 +384,6 @@ void KeyFrame::GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFo
 
     TanFovx = std::tan(Converter::Focal2Fov(fx, ImWidth) * 0.5f);
     TanFovy = std::tan(Converter::Focal2Fov(fy, ImHeight) * 0.5f);
-}
-
-void KeyFrame::UpdateGaussianScale()
-{
-    unique_lock<mutex> lock(mMutexGaussians);
-    std::vector<MapGaussian*> vpAllMapGaussians = GetMapGaussians();
-    int vpMapGaussianSize = vpAllMapGaussians.size();
-    torch::Tensor vpAllGaussianPos = torch::zeros({vpMapGaussianSize, 3}).to(torch::kCUDA, true);
-    for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
-    {
-        if(vpAllMapGaussians[iMG])
-        {
-            MapGaussian* pMG = vpAllMapGaussians[iMG];
-            torch::Tensor WorldPos = pMG->GetWorldPos();
-            vpAllGaussianPos.index_put_({(int)iMG, "..."}, WorldPos);
-        }
-    }
-
-    auto dist2 = torch::clamp_min(distCUDA2(vpAllGaussianPos), 0.0000001);
-    auto _scaling = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
-    
-    for(size_t iMG=0; iMG<vpMapGaussianSize; iMG++)
-    {
-        if(vpAllMapGaussians[iMG])
-        {
-            MapGaussian* pMG = vpAllMapGaussians[iMG];
-            torch::Tensor scale = _scaling.index({(int)iMG, "..."});
-            pMG->SetScale(scale);
-        }
-    }
 }
 
 MapPoint* KeyFrame::GetMapPoint(const size_t &idx)

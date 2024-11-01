@@ -2581,37 +2581,14 @@ void Tracking::CreateInitialMapMonocular()
         pMP->ComputeDistinctiveDescriptors();
         pMP->UpdateNormalAndDepth();
 
-        //Create corresponding MapGaussian
-        // std::cout << "-------------Create corresponding MapGaussian in CreateInitialMapMonocular------------" << std::endl;
-        #ifdef GAUSSIANSPLATTING
-        MapGaussian* pMG = new MapGaussian(worldPos,pKFcur,mpAtlas->GetCurrentMap());
-        MapGaussianTree* pMGT =  new MapGaussianTree(pMG);
-
-        pKFini->AddMapGaussianTree(pMGT,i);
-        pKFcur->AddMapGaussianTree(pMGT,mvIniMatches[i]);
-        #endif
-
         //Fill Current Frame structure
         mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
-
-        #ifdef GAUSSIANSPLATTING
-        mCurrentFrame.mvpMapGaussianForest[mvIniMatches[i]] = pMGT;
-        #endif
 
         mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
 
         //Add to Map
         mpAtlas->AddMapPoint(pMP);
-        #ifdef GAUSSIANSPLATTING
-        mpAtlas->AddMapGaussianTree(pMGT);
-        #endif
     }
-
-    // Gaussian Scale Setting
-    #ifdef GAUSSIANSPLATTING
-    // std::vector<MapGaussian*> vpAllMapGaussans = mpAtlas->GetAllMapGaussians();
-    mpAtlas->InitializeGaussianScale();
-    #endif
 
     // Update Connections
     pKFini->UpdateConnections();
@@ -2622,14 +2599,9 @@ void Tracking::CreateInitialMapMonocular()
 
     // Bundle Adjustment
     Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
-    #ifdef GAUSSIANSPLATTING
-    Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapGaussianTreesInMap()) + " gaussian trees", Verbose::VERBOSITY_QUIET);
-    #endif
-
     Optimizer::GlobalBundleAdjustemnt(mpAtlas->GetCurrentMap(),20);
 
     #ifdef GAUSSIANSPLATTING
-    // Gaussian Optimizer
     Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
     #endif
 
@@ -2654,11 +2626,6 @@ void Tracking::CreateInitialMapMonocular()
 
     // Scale points and Gaussians
     vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
-
-    // #ifdef GAUSSIANSPLATTING
-    // std::vector<MapGaussian*> vpAllMapGaussians = pKFini->GetMapGaussians();
-    // int iMG = 0;
-    // #endif
     
     for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
     {
@@ -2672,13 +2639,6 @@ void Tracking::CreateInitialMapMonocular()
             #endif
         }
     }
-
-    // Gaussian Training Setup
-    // #ifdef GAUSSIANSPLATTING
-    // // std::vector<MapGaussian*> vpAllMapGaussans = mpAtlas->GetAllMapGaussians();
-    // pKFini->UpdateGaussianScale();
-    // // pKFcur->UpdateConnections();
-    // #endif
 
     if (mSensor == System::IMU_MONOCULAR)
     {

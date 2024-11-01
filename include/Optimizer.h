@@ -99,13 +99,6 @@ public:
     void static InertialOptimization(Map *pMap, Eigen::Vector3d &bg, Eigen::Vector3d &ba, float priorG = 1e2, float priorA = 1e6);
     void static InertialOptimization(Map *pMap, Eigen::Matrix3d &Rwg, double &scale);
 
-    // Gaussian Optimization
-    void static GlobalGaussianOptimization(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL,
-                                       const unsigned long nLoopKF=0, const bool bRobust = true);
-    void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, 
-                              const vector<MapGaussian *> &vpMG, int nIterations, bool* pbStopFlag, 
-                              const unsigned long nLoopKF, const bool bRobust);
-
     // GaussianCluster Optimization
     void static GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale);
     void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale);

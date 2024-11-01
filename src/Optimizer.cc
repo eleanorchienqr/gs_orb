@@ -5589,38 +5589,11 @@ void Optimizer::OptimizeEssentialGraph4DoF(Map* pMap, KeyFrame* pLoopKF, KeyFram
     pMap->IncreaseChangeIndex();
 }
 
-void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, bool *pbStopFlag,
-                                       const unsigned long nLoopKF, const bool bRobust)
-{
-    vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
-    vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
-    vector<MapGaussian*> vpMG = pMap->GetAllMapGaussians();
-    // BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
-    // vector<MapGaussianNode*> vpMGN = pMap->GetMapGaussianNodes();
-    // GaussianOptimization(vpKFs,vpMP,vpMGN,nIterations,pbStopFlag, nLoopKF, bRobust);
-    GaussianOptimization(vpKFs,vpMP,vpMG,nIterations,pbStopFlag, nLoopKF, bRobust);
-}
-
 void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale)
 {
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
     GaussianOptimization(vpKFs,vpMP,nIterations, bInitializeScale);
-}
-
-
-void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, const vector<MapGaussian *> &vpMG, 
-                                 int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
-{
-    ORB_SLAM3::OptimizationParameters OptimParams;
-    GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
-    optimizer.InitializeOptimization(vpKFs, vpMG);
-    optimizer.Optimize();
-
-    // Recover optimized data
-    // optimizer->mvpGaussianRootIndex
-    // vpMG.resize(mvpGaussianRootIndex.size())
-    // return std::vector<MapGaussianNode* >
 }
 
 void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale)
@@ -5682,13 +5655,13 @@ void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
     lLocalKeyFrames.push_back(pKF);
     Map* pCurrentMap = pKF->GetMap();
 
-    // const vector<KeyFrame*> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
-    // for(int i=0, iend=vNeighKFs.size(); i<iend; i++)
-    // {
-    //     KeyFrame* pKFi = vNeighKFs[i];
-    //     if(!pKFi->isBad() && pKFi->GetMap() == pCurrentMap)
-    //         lLocalKeyFrames.push_back(pKFi);
-    // }
+    const vector<KeyFrame*> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
+    for(int i=0, iend=vNeighKFs.size(); i<iend; i++)
+    {
+        KeyFrame* pKFi = vNeighKFs[i];
+        if(!pKFi->isBad() && pKFi->GetMap() == pCurrentMap)
+            lLocalKeyFrames.push_back(pKFi);
+    }
 
     // Local MapPoints and Gaussians seen in Local KeyFrames
     std::vector<MapPoint*> lLocalMapPoints;

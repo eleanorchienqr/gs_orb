@@ -177,34 +177,6 @@ void MapDrawer::DrawMapPoints()
     glEnd();
 }
 
-void MapDrawer::DrawMapGaussians()
-{
-    Map* pActiveMap = mpAtlas->GetCurrentMap();
-    if(!pActiveMap)
-        return;
-
-    const vector<MapGaussian*> &vpMGTs = pActiveMap->GetAllMapGaussians();
-
-    if(vpMGTs.empty())
-        return;
-
-    // glPointSize(mPointSize);
-    glPointSize(20.0);
-    glBegin(GL_POINTS);
-    glColor3f(1.0,1.0,0.0);
-
-    for(size_t i=0, iend=vpMGTs.size(); i<iend;i++)
-    {
-        torch::Tensor posTensorGPU = vpMGTs[i]->GetWorldPos();
-        torch::Tensor posTensorCPU = posTensorGPU.cpu();
-        Eigen::Vector3f posVecTmp(posTensorCPU.size(1), posTensorCPU.size(0));
-        std::copy(posTensorCPU.data_ptr<float>(), posTensorCPU.data_ptr<float>() + posTensorCPU.numel(), posVecTmp.data());
-        Eigen::Vector3f posVec = posVecTmp.transpose();
-        glVertex3f(posVec(0),posVec(1),posVec(2));
-    }
-    glEnd();
-}
-
 void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph, const bool bDrawInertialGraph, const bool bDrawOptLba)
 {
     const float &w = mKeyFrameSize;

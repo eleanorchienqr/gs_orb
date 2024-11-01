@@ -38,90 +38,6 @@ GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &Op
 
 }
 
-void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapGaussian *> &vpMG)
-{
-    std::cout << ">>>>>>>[InitializeOptimization] The numbers of Gaussians in Map: " << vpMG.size() << std::endl;
-    
-    // Get Gaussian Data
-    mSizeofGaussians = vpMG.size();
-    mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mOpacity = torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-
-
-    torch::Tensor Features = torch::zeros({mSizeofGaussians, 3, static_cast<long>(std::pow((mSHDegree + 1), 2))}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    
-    mvpGaussianRootIndex = std::vector<long>(mSizeofGaussians, static_cast<long>(-1));
-
-    for(size_t i=0; i<vpMG.size(); i++)
-    {
-        ORB_SLAM3::MapGaussian* pMG = vpMG[i];
-        if(pMG)
-        {
-            mMeans3D.index_put_({(int)i, "..."},  pMG->GetWorldPos());
-            mOpacity.index_put_({(int)i, "..."},  pMG->GetOpacity());
-            mScales.index_put_({(int)i, "..."},   pMG->GetScale());
-            mRotation.index_put_({(int)i, "..."}, pMG->GetRotation());
-            Features.index_put_({(int)i, "..."}, pMG->GetFeature());
-
-            mvpGaussianRootIndex[i] = i;
-        }
-    }
-
-    mFeaturesDC = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 1)}).transpose(1, 2).contiguous().to(torch::kCUDA);
-    mFeaturesRest = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None)}).transpose(1, 2).contiguous().to(torch::kCUDA);
-
-    mMeans3D.set_requires_grad(true);
-    mOpacity.set_requires_grad(true);
-    mScales.set_requires_grad(true);
-    mRotation.set_requires_grad(true);
-    mFeaturesDC.set_requires_grad(true);
-    mFeaturesRest.set_requires_grad(true);
-    
-    // Get Camera and Image Data
-    mSizeofCameras = vpKFs.size();
-    vpKFs[0]->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
-    mProjMatrix = SetProjMatrix();
-
-    std::cout << "[GaussianSplatting::Optimize] mSizeofCameras: " << mSizeofCameras << std::endl;
-    std::cout << "[GaussianSplatting::Optimize] mImHeight: " << mImHeight << std::endl;
-    std::cout << "[GaussianSplatting::Optimize] mImWidth: " << mImWidth << std::endl;
-    std::cout << "[GaussianSplatting::Optimize] mTanFovx: " << mTanFovx << std::endl;
-    std::cout << "[GaussianSplatting::Optimize] mTanFovy: " << mTanFovy << std::endl;
-
-    for(size_t i=0; i<vpKFs.size(); i++)
-    {
-        ORB_SLAM3::KeyFrame* pKF = vpKFs[i];
-        if(pKF->isBad())
-            continue;
-        Sophus::SE3f Tcw = pKF->GetPose();
-        torch::Tensor ViewMatrix = GetViewMatrix(Tcw);
-        torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0);
-        torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
-
-        mTrainedImages.push_back(pKF->mIm);
-        torch::Tensor TrainedImageTensor = CVMatToTensor(pKF->mIm);
-        mTrainedImagesTensor.push_back(TrainedImageTensor.to(torch::kCUDA)); // 1.0 / 225.
-
-        mViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
-        mProjMatrices.push_back(FullProjMatrix.to(torch::kCUDA));
-        mCameraCenters.push_back(CamCenter.to(torch::kCUDA));
-
-        std::cout << "[GaussianSplatting::Optimize] ViewMatrix: " << i << ", " << mViewMatrices[i] << std::endl;
-        std::cout << "[GaussianSplatting::Optimize] ProjMatrix: " << i << ", " << mProjMatrices[i] << std::endl;
-    }
-
-    // Calculate cameras associated members for densification
-    auto [mNerfNormTranslation, mNerfNormRadius] = GetNerfppNorm();
-
-    // Setup Optimizer
-    TrainingSetup();
-    // Setup Loss Monitor
-    mLossMonitor = new GaussianSplatting::LossMonitor(200);
-    mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
-}
-
 void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale)
 {
 
@@ -183,7 +99,7 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
         torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
         mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
     }
-    
+
     std::cout << "[InitializeOptimization] mSizeofGaussians: " << mSizeofGaussians << std::endl;
 
     // Get Camera and Image Data

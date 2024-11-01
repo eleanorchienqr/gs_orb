@@ -20,7 +20,6 @@
 
 #include "G2oTypes.h"
 #include "MapPoint.h"
-#include "MapGaussian.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
 #include "Converter.h"
@@ -60,7 +59,7 @@ Frame::Frame(const Frame &frame)
      mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
      mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
      mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
-     mvpMapPoints(frame.mvpMapPoints),  mvpMapGaussianForest(frame.mvpMapGaussianForest), mvbOutlier(frame.mvbOutlier), mImuCalib(frame.mImuCalib), mnCloseMPs(frame.mnCloseMPs),
+     mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mImuCalib(frame.mImuCalib), mnCloseMPs(frame.mnCloseMPs),
      mpImuPreintegrated(frame.mpImuPreintegrated), mpImuPreintegratedFrame(frame.mpImuPreintegratedFrame), mImuBias(frame.mImuBias),
      mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
      mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
@@ -150,7 +149,6 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 #endif
 
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
-    mvpMapGaussianForest  = vector<MapGaussianTree*>(N,static_cast<MapGaussianTree*>(NULL));
     mvbOutlier = vector<bool>(N,false);
     mmProjectPoints.clear();
     mmMatchedInImage.clear();
@@ -242,7 +240,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
     ComputeStereoFromRGBD(imDepth);
 
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
-    mvpMapGaussianForest  = vector<MapGaussianTree*>(N,static_cast<MapGaussianTree*>(NULL));
 
     mmProjectPoints.clear();
     mmMatchedInImage.clear();
@@ -338,7 +335,6 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
     mnCloseMPs = 0;
 
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
-    mvpMapGaussianForest  = vector<MapGaussianTree*>(N,static_cast<MapGaussianTree*>(NULL));
 
     mmProjectPoints.clear();// = map<long unsigned int, cv::Point2f>(N, static_cast<cv::Point2f>(NULL));
     mmMatchedInImage.clear();
@@ -1125,7 +1121,6 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
     cv::vconcat(mDescriptors,mDescriptorsRight,mDescriptors);
 
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(nullptr));
-    mvpMapGaussianForest  = vector<MapGaussianTree*>(N,static_cast<MapGaussianTree*>(nullptr));
     mvbOutlier = vector<bool>(N,false);
 
     AssignFeaturesToGrid();

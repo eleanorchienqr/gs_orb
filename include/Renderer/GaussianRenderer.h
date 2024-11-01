@@ -3,17 +3,14 @@
 #define GAUSSIANRENDERER_H
 #include <vector>
 
-#include "MapGaussian.h"
 
 namespace ORB_SLAM3
 {
 
-class MapGaussian;
-
 class GaussianRenderer
 {
-private:
-    std::vector<MapGaussian*> MapGaussians;
+// private:
+    // std::vector<MapGaussian*> MapGaussians;
 
 };
 

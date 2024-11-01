@@ -21,7 +21,6 @@
 #define KEYFRAME_H
 
 #include "MapPoint.h"
-#include "MapGaussian.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
@@ -45,8 +44,6 @@ namespace ORB_SLAM3
 
 class Map;
 class MapPoint;
-class MapGaussianTree;
-class MapGaussian;
 class Frame;
 class KeyFrameDatabase;
 
@@ -217,6 +214,9 @@ public:
     Eigen::Vector3f GetVelocity();
     bool isVelocitySet();
 
+    // Gaussian Getter
+    void GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy);
+
     // Bag of Words Representation
     void ComputeBoW();
 
@@ -252,7 +252,6 @@ public:
     // MapPoint observation functions
     int GetNumberMPs();
     void AddMapPoint(MapPoint* pMP, const size_t &idx);
-    void AddMapGaussianTree(MapGaussianTree *pMGT, const size_t &idx);
     void EraseMapPointMatch(const int &idx);
     void EraseMapPointMatch(MapPoint* pMP);
     void ReplaceMapPointMatch(const int &idx, MapPoint* pMP);
@@ -260,11 +259,6 @@ public:
     std::vector<MapPoint*> GetMapPointMatches();
     int TrackedMapPoints(const int &minObs);
     MapPoint* GetMapPoint(const size_t &idx);
-
-    //MapGaussian functions
-    std::vector<MapGaussian*> GetMapGaussians();
-    void GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy);
-    void UpdateGaussianScale();
 
     // KeyPoint functions
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const bool bRight = false) const;
@@ -457,7 +451,6 @@ protected:
 
     // MapPoints associated to keypoints
     std::vector<MapPoint*> mvpMapPoints;
-    std::vector<MapGaussianTree*> mvpMapGaussianForest;
     // For save relation without pointer, this is necessary for save/load function
     std::vector<long long int> mvBackupMapPointsId;
 
@@ -510,7 +503,6 @@ protected:
     std::mutex mMutexPose; // for pose, velocity and biases
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
-    std::mutex mMutexGaussians;
     std::mutex mMutexMap;
 
 public:

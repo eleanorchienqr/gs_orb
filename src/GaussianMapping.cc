@@ -162,106 +162,106 @@ bool GaussianMapping::CheckNewKeyFrames()
 
 void GaussianMapping::ProcessNewKeyFrame()
 {
-    {
-        unique_lock<mutex> lock(mMutexNewKFs);
-        mpCurrentKeyFrame = mlNewKeyFrames.front();
-        mlNewKeyFrames.pop_front();
-    }
+    // {
+    //     unique_lock<mutex> lock(mMutexNewKFs);
+    //     mpCurrentKeyFrame = mlNewKeyFrames.front();
+    //     mlNewKeyFrames.pop_front();
+    // }
 
-    // render
-    const std::vector<MapGaussian*> vpMapGaussians = mpCurrentKeyFrame->GetMapGaussians();
-    std::cout << ">>>>>>>The numbers of Gaussians in initial KeyFrame: " << vpMapGaussians.size() << std::endl;
+    // // render
+    // const std::vector<MapGaussian*> vpMapGaussians = mpCurrentKeyFrame->GetMapGaussians();
+    // std::cout << ">>>>>>>The numbers of Gaussians in initial KeyFrame: " << vpMapGaussians.size() << std::endl;
 
-    const int SizeofGaussians = vpMapGaussians.size();
-    torch::Tensor Means3D = torch::zeros({SizeofGaussians, 3});
-    torch::Tensor Opacity = torch::zeros({SizeofGaussians, 1});
-    torch::Tensor Scales = torch::zeros({SizeofGaussians, 3});
-    torch::Tensor Rotation = torch::zeros({SizeofGaussians, 4});
-    torch::Tensor Means2D = torch::zeros({SizeofGaussians, 2});
-    torch::Tensor Features = torch::zeros({SizeofGaussians, 3, static_cast<long>(std::pow((10 + 1), 2))});
-    auto cov3D_precomp = torch::Tensor();
-    torch::Tensor colors_precomp = torch::Tensor();
+    // const int SizeofGaussians = vpMapGaussians.size();
+    // torch::Tensor Means3D = torch::zeros({SizeofGaussians, 3});
+    // torch::Tensor Opacity = torch::zeros({SizeofGaussians, 1});
+    // torch::Tensor Scales = torch::zeros({SizeofGaussians, 3});
+    // torch::Tensor Rotation = torch::zeros({SizeofGaussians, 4});
+    // torch::Tensor Means2D = torch::zeros({SizeofGaussians, 2});
+    // torch::Tensor Features = torch::zeros({SizeofGaussians, 3, static_cast<long>(std::pow((10 + 1), 2))});
+    // auto cov3D_precomp = torch::Tensor();
+    // torch::Tensor colors_precomp = torch::Tensor();
 
-    for(size_t i=0; i<vpMapGaussians.size(); i++)
-    {
-        MapGaussian* pMG = vpMapGaussians[i];
-        if(pMG)
-        {
-            Means3D.index_put_({(int)i, "..."},  pMG->GetWorldPos());
-            Opacity.index_put_({(int)i, "..."},  pMG->GetOpacity());
-            Scales.index_put_({(int)i, "..."},   pMG->GetScale());
-            Rotation.index_put_({(int)i, "..."}, pMG->GetRotation());
-            Features.index_put_({(int)i, "..."}, pMG->GetFeature());
-            // if(!pMP->isBad())
-            // {
-            //     if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
-            //     {
-            //         pMP->AddObservation(mpCurrentKeyFrame, i);
-            //     }
-            //     else // this can only happen for new stereo points inserted by the Tracking
-            //     {
-            //         mlpRecentAddedMapPoints.push_back(pMP);
-            //     }
-            // }
-        }
-    }
+    // for(size_t i=0; i<vpMapGaussians.size(); i++)
+    // {
+    //     MapGaussian* pMG = vpMapGaussians[i];
+    //     if(pMG)
+    //     {
+    //         Means3D.index_put_({(int)i, "..."},  pMG->GetWorldPos());
+    //         Opacity.index_put_({(int)i, "..."},  pMG->GetOpacity());
+    //         Scales.index_put_({(int)i, "..."},   pMG->GetScale());
+    //         Rotation.index_put_({(int)i, "..."}, pMG->GetRotation());
+    //         Features.index_put_({(int)i, "..."}, pMG->GetFeature());
+    //         // if(!pMP->isBad())
+    //         // {
+    //         //     if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+    //         //     {
+    //         //         pMP->AddObservation(mpCurrentKeyFrame, i);
+    //         //     }
+    //         //     else // this can only happen for new stereo points inserted by the Tracking
+    //         //     {
+    //         //         mlpRecentAddedMapPoints.push_back(pMP);
+    //         //     }
+    //         // }
+    //     }
+    // }
 
-    // Fetch Camera Info
-    cv::Mat im;
-    mpCurrentKeyFrame->mIm.copyTo(im);
-    const int imWidth = im.cols;
-    const int imHeight = im.rows;
+    // // Fetch Camera Info
+    // cv::Mat im;
+    // mpCurrentKeyFrame->mIm.copyTo(im);
+    // const int imWidth = im.cols;
+    // const int imHeight = im.rows;
 
-    const Eigen::Matrix3f K = mpCurrentKeyFrame->mpCamera->toK_();
-    Sophus::SE3f Tcw = mpCurrentKeyFrame->GetPose();
+    // const Eigen::Matrix3f K = mpCurrentKeyFrame->mpCamera->toK_();
+    // Sophus::SE3f Tcw = mpCurrentKeyFrame->GetPose();
 
-    const float tanfovx = std::tan(focal2fov(mpCurrentKeyFrame->fx, imWidth) * 0.5f);
-    const float tanfovy = std::tan(focal2fov(mpCurrentKeyFrame->fy, imHeight) * 0.5f);
-    torch::Tensor ViewMatrix = GetViewMatrix(Tcw);
+    // const float tanfovx = std::tan(focal2fov(mpCurrentKeyFrame->fx, imWidth) * 0.5f);
+    // const float tanfovy = std::tan(focal2fov(mpCurrentKeyFrame->fy, imHeight) * 0.5f);
+    // torch::Tensor ViewMatrix = GetViewMatrix(Tcw);
 
-    float far;
-    if(mbFarPoints)
-        far = mThFarPoints;
-    else
-        far = 100.f;
-    const float near = 0.01f;
-    torch::Tensor ProjMatrix = GetProjMatrix(near, far, tanfovx, tanfovy);
-    torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(ProjMatrix.unsqueeze(0)).squeeze(0);
-    torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
+    // float far;
+    // if(mbFarPoints)
+    //     far = mThFarPoints;
+    // else
+    //     far = 100.f;
+    // const float near = 0.01f;
+    // torch::Tensor ProjMatrix = GetProjMatrix(near, far, tanfovx, tanfovy);
+    // torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(ProjMatrix.unsqueeze(0)).squeeze(0);
+    // torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
 
-    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << "; ViewMatrix " << ViewMatrix << std::endl;
-    // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << "; ProjMatrix " << FullProjMatrix << std::endl;
+    // // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << "; ViewMatrix " << ViewMatrix << std::endl;
+    // // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << "; ProjMatrix " << FullProjMatrix << std::endl;
 
-    // Set up rasterization configuration
-    GaussianRasterizationSettings raster_settings = {
-        .image_height = imHeight,
-        .image_width = imWidth,
-        .tanfovx = tanfovx,
-        .tanfovy = tanfovy,
-        .bg = torch::tensor({1.f, 1.f, 1.f}),
-        .scale_modifier = 1.f,
-        .viewmatrix = ViewMatrix,
-        .projmatrix = FullProjMatrix,
-        .sh_degree = 10,
-        .camera_center = CamCenter,
-        .prefiltered = false};
+    // // Set up rasterization configuration
+    // GaussianRasterizationSettings raster_settings = {
+    //     .image_height = imHeight,
+    //     .image_width = imWidth,
+    //     .tanfovx = tanfovx,
+    //     .tanfovy = tanfovy,
+    //     .bg = torch::tensor({1.f, 1.f, 1.f}),
+    //     .scale_modifier = 1.f,
+    //     .viewmatrix = ViewMatrix,
+    //     .projmatrix = FullProjMatrix,
+    //     .sh_degree = 10,
+    //     .camera_center = CamCenter,
+    //     .prefiltered = false};
     
-    GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+    // GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
 
-    torch::cuda::synchronize();
+    // torch::cuda::synchronize();
 
-    auto [rendererd_image, radii] = rasterizer.forward(
-        Means3D,
-        Means2D,
-        Opacity,
-        Features,
-        colors_precomp,
-        Scales,
-        Rotation,
-        cov3D_precomp);
+    // auto [rendererd_image, radii] = rasterizer.forward(
+    //     Means3D,
+    //     Means2D,
+    //     Opacity,
+    //     Features,
+    //     colors_precomp,
+    //     Scales,
+    //     Rotation,
+    //     cov3D_precomp);
 
-    torch::Tensor RenderIm = rendererd_image.permute({1, 2, 0}).cpu(); // [3, h, w] -> [h, w, 3]
-    cv::Mat RenderImCV = cv::Mat(imHeight, imWidth, CV_8UC3, RenderIm.data_ptr());
+    // torch::Tensor RenderIm = rendererd_image.permute({1, 2, 0}).cpu(); // [3, h, w] -> [h, w, 3]
+    // cv::Mat RenderImCV = cv::Mat(imHeight, imWidth, CV_8UC3, RenderIm.data_ptr());
     // cv::imwrite("/home/ray/Desktop/ORB_SLAM3/test.jpg", RenderImCV);
     // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : rendererd_image size "<< RenderIm <<std::endl;
     // std::cout << "Image data in KeyFrame (Gaussian Mapping)" << mpCurrentKeyFrame->mnId << " : Twc "<< Tcw.inverse() << "; ViewMatrix " << ViewMatrix <<std::endl;

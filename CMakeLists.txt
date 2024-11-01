@@ -103,7 +103,6 @@ src/ORBextractor.cc
 src/ORBmatcher.cc
 src/FrameDrawer.cc
 src/Converter.cc
-src/MapGaussian.cc
 src/MapPoint.cc
 src/KeyFrame.cc
 src/Atlas.cc
@@ -146,7 +145,6 @@ include/ORBextractor.h
 include/ORBmatcher.h
 include/FrameDrawer.h
 include/Converter.h
-include/MapGaussian.h
 include/MapPoint.h
 include/KeyFrame.h
 include/Atlas.h

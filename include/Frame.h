@@ -22,8 +22,6 @@
 
 #include<vector>
 
-
-#include "MapGaussian.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 
@@ -47,7 +45,6 @@ namespace ORB_SLAM3
 #define FRAME_GRID_COLS 64
 
 class MapPoint;
-class MapGaussianTree;
 class KeyFrame;
 class ConstraintPoseImu;
 class GeometricCamera;
@@ -104,7 +101,6 @@ public:
     // Check if a MapPoint is in the frustum of the camera
     // and fill variables of the MapPoint to be used by the tracking
     bool isInFrustum(MapPoint* pMP, float viewingCosLimit);
-    // bool isInFrustum(MapGaussian* pMG, float viewingCosLimit);
 
     bool ProjectPointDistort(MapPoint* pMP, cv::Point2f &kp, float &u, float &v);
 
@@ -234,7 +230,6 @@ public:
 
     // Corresponding stereo coordinate and depth for each keypoint.
     std::vector<MapPoint*> mvpMapPoints;
-    std::vector<MapGaussianTree*> mvpMapGaussianForest;
     // "Monocular" keypoints have a negative value.
     std::vector<float> mvuRight;
     std::vector<float> mvDepth;

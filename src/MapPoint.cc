@@ -146,19 +146,8 @@ void MapPoint::InitializeGaussianCluster(const Eigen::Vector3f &Pos)
     mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({1, 1})).to(torch::kCUDA, true);
     mGauFeaturest = torch::zeros({1, FeaturestDim, 3}).to(torch::kCUDA, true);
     mGauFeatureDC = Converter::RGB2SH(torch::zeros({1, 1, 3})).to(torch::kCUDA, true);
-    // torch::Tensor Features = torch::zeros({1, 3, static_cast<long>(std::pow((mGauSHDegree + 1), 2))});
-    // Features.index_put_({torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, 3), 0}, GauFeatureDC);
-    // Features.index_put_({torch::indexing::Slice(), torch::indexing::Slice(3, torch::indexing::None), torch::indexing::Slice(1, torch::indexing::None)}, 0.0);
-
-    // mGauFeatureDC = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 1)}).transpose(1, 2).contiguous().to(torch::kCUDA, true);
-    // mGauFeaturest = Features.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None)}).transpose(1, 2).contiguous().to(torch::kCUDA, true);
 
     mGauNum = 1;
-    // std::cout << "[InitializeGaussianCluster] WorldPos of MapPoint: " << PosTranspose << std::endl;
-    // std::cout << "[InitializeGaussianCluster] WorldPos of Gaussian: " << mGauWorldPos << std::endl;
-    // std::cout << "[InitializeGaussianCluster] mGauFeatureDC of Gaussian: " << mGauFeatureDC << std::endl;
-    // std::cout << "[InitializeGaussianCluster] mGauFeaturest of Gaussian: " << mGauFeaturest << std::endl;
-    // std::cout << std:: endl;
 }
 
 void MapPoint::ResetGauAttributes(const long GauNum)

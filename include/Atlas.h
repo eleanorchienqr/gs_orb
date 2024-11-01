@@ -20,7 +20,6 @@
 #define ATLAS_H
 
 #include "Map.h"
-#include "MapGaussian.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include "GeometricCamera.h"
@@ -38,8 +37,6 @@ namespace ORB_SLAM3
 class Viewer;
 class Map;
 class MapPoint;
-class MapGaussian;
-class MapGaussianTree;
 class KeyFrame;
 class KeyFrameDatabase;
 class Frame;
@@ -89,12 +86,8 @@ public:
     // Method for change components in the current map
     void AddKeyFrame(KeyFrame* pKF);
     void AddMapPoint(MapPoint* pMP);
-    void AddMapGaussianTree(MapGaussianTree* pMGT);
     //void EraseMapPoint(MapPoint* pMP);
     //void EraseKeyFrame(KeyFrame* pKF);
-
-    // Method for adjust Gaussian in map
-    void InitializeGaussianScale();
 
     GeometricCamera* AddCamera(GeometricCamera* pCam);
     std::vector<GeometricCamera*> GetAllCameras();
@@ -105,13 +98,11 @@ public:
     int GetLastBigChangeIdx();
 
     long unsigned int MapPointsInMap();
-    long unsigned int MapGaussianTreesInMap();
     long unsigned KeyFramesInMap();
 
     // Method for get data in current map
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
-    std::vector<MapGaussian*> GetAllMapGaussians();
     std::vector<MapPoint*> GetReferenceMapPoints();
 
     vector<Map*> GetAllMaps();

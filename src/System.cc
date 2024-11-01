@@ -235,19 +235,25 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //Set pointers between threads
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
-    mpTracker->SetGaussianMapper(mpGaussianMapper);
+    
 
     mpLocalMapper->SetTracker(mpTracker);
     mpLocalMapper->SetLoopCloser(mpLoopCloser);
-    mpLocalMapper->SetGaussianMapper(mpGaussianMapper);
+    
 
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
+    
+
+    #ifdef GAUSSIANSPLATTING
+    mpTracker->SetGaussianMapper(mpGaussianMapper);
+    mpLocalMapper->SetGaussianMapper(mpGaussianMapper);
     // mpLoopCloser->SetGaussianMapper(mpGaussianMapper);
 
     mpGaussianMapper->SetTracker(mpTracker);
     mpGaussianMapper->SetLocalMapper(mpLocalMapper);
     // mpGaussianMapper->SetLoopClosing(mpLoopCloser);
+    #endif
 
     //usleep(10*1000*1000);
 
