@@ -1,5 +1,7 @@
 ./Examples/Monocular/mono_euroc ./Vocabulary/ORBvoc.txt ./Examples/Monocular/EuRoC.yaml /home/ray/Desktop/Dataset/EuROC/MH_03_medium ./Examples/Monocular/EuRoC_TimeStamps/MH03.txt dataset-MH03_mono
 
+./Examples/Monocular/mono_tum ./Vocabulary/ORBvoc.txt ./Examples/Monocular/TUM3.yaml /home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household
+
 evo_traj euroc /home/ray/Desktop/Dataset/EuROC/MH_03_medium/mav0/state_groundtruth_estimate0/data.csv --save_as_tum 
 
 evo_traj tum f_dataset-MH03_mono.txt --ref=./Groundtruth/MH03_GT.tum --align --plot -vas

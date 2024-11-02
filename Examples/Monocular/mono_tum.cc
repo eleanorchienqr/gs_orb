@@ -105,8 +105,14 @@ int main(int argc, char **argv)
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
 
-        // Pass the image to the SLAM system
-        SLAM.TrackMonocular(im,tframe);
+        // // Pass the image to the SLAM system
+        // SLAM.TrackMonocular(im,tframe);
+#ifdef GAUSSIANSPLATTING
+            // std::cout << "2. imgsize before TrackMonocularGS: " << im.cols << ", " << im.rows << std:: endl;
+        SLAM.TrackMonocularGS(im,tframe); 
+#else
+        SLAM.TrackMonocular(im,tframe); // TODO change to monocular_inertial
+#endif
 
 #ifdef COMPILEDWITHC17
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();

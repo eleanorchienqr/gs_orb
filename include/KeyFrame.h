@@ -377,6 +377,7 @@ public:
     const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
     cv::Mat mDistCoef;
     cv::Mat mIm;
+    cv::Mat mImRGB;
 
     // Number of KeyPoints
     const int N;

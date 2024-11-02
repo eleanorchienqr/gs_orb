@@ -1593,18 +1593,18 @@ Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &times
     if (mSensor == System::MONOCULAR)
     {
         if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET ||(lastID - initID) < mMaxFrames)
-            mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+            mCurrentFrame = Frame(im, mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
         else
-            mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+            mCurrentFrame = Frame(im, mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
     }
     else if(mSensor == System::IMU_MONOCULAR)
     {
         if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
         {
-            mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
+            mCurrentFrame = Frame(im, mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
         }
         else
-            mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
+            mCurrentFrame = Frame(im, mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
     }
 
     if (mState==NO_IMAGES_YET)
@@ -2653,13 +2653,6 @@ void Tracking::CreateInitialMapMonocular()
     mpLocalMapper->InsertKeyFrame(pKFini);
     mpLocalMapper->InsertKeyFrame(pKFcur);
     mpLocalMapper->mFirstTs=pKFcur->mTimeStamp;
-
-    #ifdef GAUSSIANSPLATTING
-    mpGaussianMapper->InsertKeyFrame(pKFini);
-    mpGaussianMapper->InsertKeyFrame(pKFcur);
-    mpGaussianMapper->mFirstTs=pKFcur->mTimeStamp;
-    // std::cout << ">>>>>>>KeyFrameInQueue in GS: " << mpGaussianMapper->KeyframesInQueue() <<std::endl;
-    #endif
 
     mCurrentFrame.SetPose(pKFcur->GetPose());
     mnLastKeyFrameId=mCurrentFrame.mnId;

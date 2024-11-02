@@ -99,7 +99,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
 
     //img
     F.mIm.copyTo(mIm);
-    // std::cout << ">>Image data in KeyFrame: " << mnId << " : " << mIm.cols << "; " << mIm.rows << std::endl;
+    F.mImRGB.copyTo(mImRGB);
+    // std::cout << ">>Image data in KeyFrame: " << mnId << " : " << F.mImRGB.size() << std::endl;
 }
 
 void KeyFrame::ComputeBoW()
