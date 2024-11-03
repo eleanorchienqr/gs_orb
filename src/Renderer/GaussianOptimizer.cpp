@@ -124,16 +124,10 @@ void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3
         torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0);
         torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
 
-        // std::cout << "3. imgsize before Frame construction: " << pKF->mImRGB.cols << ", " << pKF->mImRGB.rows << std:: endl;
-
         mTrainedImages.push_back(pKF->mImRGB);
-        // std::cout << "[GaussianSplatting::Optimize] debug 0" << std::endl;
         torch::Tensor TrainedImageTensor = CVMatToTensor(pKF->mImRGB);
-        // std::cout << "[GaussianSplatting::Optimize] debug 1" << TrainedImageTensor << std::endl;
+
         mTrainedImagesTensor.push_back(TrainedImageTensor.to(torch::kCUDA)); // 1.0 / 225.
-
-        
-
         mViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
         mProjMatrices.push_back(FullProjMatrix.to(torch::kCUDA));
         mCameraCenters.push_back(CamCenter.to(torch::kCUDA));
@@ -589,9 +583,6 @@ cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
 
 torch::Tensor GaussianOptimizer::CVMatToTensor(cv::Mat mat)
 {
-    // std::cout << "[GaussianSplatting::Optimize] debug 1 " << mat.size() << " channel: " << mat.channels() << std::endl;
-    // cv::cvtColor(mat, mat,cv::COLOR_RGB2GRAY);
-    cv::imwrite("CVMatToTensor.jpg",mat);
     cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
     cv::Mat matFloat;
     mat.convertTo(matFloat, CV_32F, 1.0 / 255);
@@ -600,7 +591,7 @@ torch::Tensor GaussianOptimizer::CVMatToTensor(cv::Mat mat)
     auto nChannels = matFloat.channels();
     auto tensor = torch::from_blob(matFloat.data, {size.height, size.width, nChannels});
 
-    return tensor.permute({2, 0, 1});
+    return tensor.permute({2, 0, 1}).clone();
 }
 
 void GaussianOptimizer::TrainingSetup()
