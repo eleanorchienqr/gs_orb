@@ -17,8 +17,8 @@
 */
 
 
-#ifndef GAUSSIANMAPPING_H
-#define GAUSSIANMAPPING_H
+#ifndef GaussianViewer_H
+#define GaussianViewer_H
 
 #include "KeyFrame.h"
 #include "Atlas.h"
@@ -27,11 +27,16 @@
 #include "Tracking.h"
 #include "KeyFrameDatabase.h"
 #include "Settings.h"
-#include "RenderGUI.h"
 #include "Config.h"
 
 #include <torch/torch.h>
 #include <mutex>
+
+#include <Thirdparty/imgui/imgui.h>
+#include <Thirdparty/imgui/backends/imgui_impl_glfw.h>
+#include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 
 namespace ORB_SLAM3
@@ -42,20 +47,34 @@ class Tracking;
 class LoopClosing;
 class LocalMapping;
 class Atlas;
-class RenderGUI;
 
-class GaussianMapping
+class GaussianViewer
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    GaussianMapping(System* pSys, Atlas* pAtlas, const float bMonocular, bool bInertial, const string &_strSeqName=std::string());
+    GaussianViewer(System* pSys, Atlas* pAtlas, const float bMonocular, bool bInertial, const string &_strSeqName=std::string());
 
     void SetLoopCloser(LoopClosing* pLoopCloser);
     void SetTracker(Tracking* pTracker);
     void SetLocalMapper(LocalMapping* pLocalMapper);
 
-    // Main function
+    // void newParameterLoader(Settings* settings);
+
+    // Main thread function for rendering scenes from Gaussians.
+    // Drawing is refreshed according to the camera fps. We use ImGUI.
     void Run();
+
+    // void RequestFinish();
+
+    // void RequestStop();
+
+    // bool isFinished();
+
+    // bool isStopped();
+
+    // bool isStepByStep();
+
+    // void Release();
 
     // For debugging (erase in normal mode)
     int mInitFr;
@@ -76,12 +95,44 @@ protected:
     Tracking* mpTracker;
     LocalMapping* mpLocalMapper;
 
-    // RenderGUI
-    RenderGUI* mpGUI;
-    // std::list<MapPoint*> mlpRecentAddedMapPoints;
+    // bool ParseViewerParamFile(cv::FileStorage &fSettings);
+
+    // bool Stop();
+
+    // 1/fps in ms
+    double mT;
+    float mImageWidth, mImageHeight;
+    float mImageViewerScale;
+
+    float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
+
+    // Window settings
+    const int mWindowSizeWidth = 1200;
+    const int mWindowSizeHeight = 800;
+
+    GLFWwindow* mGLFWindow = nullptr;
+
+    bool mGUIRedraw = true;
+    bool mRenderWindow = false; // open in InitializeWindow; control render or not
+    
+    void ImGUIWindowTest();
+
+    // Thread Functions
+    // bool CheckFinish();
+    // void SetFinish();
+    // bool mbFinishRequested;
+    // bool mbFinished;
+    // std::mutex mMutexFinish;
+
+    // bool mbStopped;
+    // bool mbStopRequested;
+    // std::mutex mMutexStop;
+
+    // bool mbStopTrack;
 
 };
 
+
 } //namespace ORB_SLAM
 
-#endif // GAUSSIANMAPPING_H
+#endif // GaussianViewer_H

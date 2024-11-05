@@ -1,6 +1,6 @@
 ./Examples/Monocular/mono_euroc ./Vocabulary/ORBvoc.txt ./Examples/Monocular/EuRoC.yaml /home/ray/Desktop/Dataset/EuROC/MH_03_medium ./Examples/Monocular/EuRoC_TimeStamps/MH03.txt dataset-MH03_mono
 
-./Examples/Monocular/mono_tum ./Vocabulary/ORBvoc.txt ./Examples/Monocular/TUM3.yaml /home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household
+./Examples/Monocular/mono_tum ./Vocabulary/ORBvoc.txt ./Examples/Monocular/TUM3_modified.yaml /home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household
 
 evo_traj euroc /home/ray/Desktop/Dataset/EuROC/MH_03_medium/mav0/state_groundtruth_estimate0/data.csv --save_as_tum 
 
@@ -16,7 +16,7 @@ unzip libtorch-cxx11-abi-shared-with-deps-2.4.0+cu121.zip -d Thirdparty/
 
 Folder `Shaders` includes a vertex shader `gau_vert.glsl` and a fragment shader `gau_frag.glsl`.
 
-`OpenGL 4.6.0` with `GLFW 3.4` and `imgui` for visualization under a new thread `GaussianMapping`, referred by `instant-ngp` and `Orbeez-SLAM`.
+`OpenGL 4.6.0` with `GLFW 3.4` and `imgui` for visualization under a new thread `GaussianViewer`, referred by `instant-ngp` and `Orbeez-SLAM`.
 
 # LibTorch
 

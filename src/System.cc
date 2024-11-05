@@ -209,23 +209,23 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpLocalMapper->mbFarPoints = false;
 
     //Initialize the Gaussian Renderer thread and launch
-    #ifdef GAUSSIANSPLATTING
-    mpGaussianMapper = new GaussianMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
-                                        mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
-    mptGaussianMapping = new thread(&ORB_SLAM3::GaussianMapping::Run,mpGaussianMapper);
-    mpGaussianMapper->mInitFr = initFr;
-    if(settings_)
-        mpGaussianMapper->mThFarPoints = settings_->thFarPoints();
-    else
-        mpGaussianMapper->mThFarPoints = fsSettings["thFarPoints"];
-    if(mpGaussianMapper->mThFarPoints!=0)
-    {
-        cout << "Discard gaussians further than " << mpGaussianMapper->mThFarPoints << " m from current camera" << endl;
-        mpGaussianMapper->mbFarPoints = true;
-    }
-    else
-        mpGaussianMapper->mbFarPoints = false;
-    #endif
+    // #ifdef GAUSSIANSPLATTING
+    // mpGaussianViewer = new GaussianViewer(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
+    //                                     mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
+    // mptGaussianViewer = new thread(&ORB_SLAM3::GaussianViewer::Run,mpGaussianViewer);
+    // mpGaussianViewer->mInitFr = initFr;
+    // if(settings_)
+    //     mpGaussianViewer->mThFarPoints = settings_->thFarPoints();
+    // else
+    //     mpGaussianViewer->mThFarPoints = fsSettings["thFarPoints"];
+    // if(mpGaussianViewer->mThFarPoints!=0)
+    // {
+    //     cout << "Discard gaussians further than " << mpGaussianViewer->mThFarPoints << " m from current camera" << endl;
+    //     mpGaussianViewer->mbFarPoints = true;
+    // }
+    // else
+    //     mpGaussianViewer->mbFarPoints = false;
+    // #endif
 
     //Initialize the Loop Closing thread and launch
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
@@ -243,17 +243,6 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
-    
-
-    #ifdef GAUSSIANSPLATTING
-    mpTracker->SetGaussianMapper(mpGaussianMapper);
-    mpLocalMapper->SetGaussianMapper(mpGaussianMapper);
-    // mpLoopCloser->SetGaussianMapper(mpGaussianMapper);
-
-    mpGaussianMapper->SetTracker(mpTracker);
-    mpGaussianMapper->SetLocalMapper(mpLocalMapper);
-    // mpGaussianMapper->SetLoopClosing(mpLoopCloser);
-    #endif
 
     //usleep(10*1000*1000);
 
@@ -266,11 +255,24 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpTracker->SetViewer(mpViewer);
         mpLoopCloser->mpViewer = mpViewer;
         mpViewer->both = mpFrameDrawer->both;
+
+        #ifdef GAUSSIANSPLATTING
+        mpGaussianViewer = new GaussianViewer(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
+                                        mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
+        mptGaussianViewer = new thread(&ORB_SLAM3::GaussianViewer::Run,mpGaussianViewer);
+
+        mpTracker->SetGaussianViewer(mpGaussianViewer);
+        mpLocalMapper->SetGaussianViewer(mpGaussianViewer);
+        // mpLoopCloser->SetGaussianViewer(mpGaussianViewer);
+
+        mpGaussianViewer->SetTracker(mpTracker);
+        mpGaussianViewer->SetLocalMapper(mpLocalMapper);
+        // mpGaussianViewer->SetLoopClosing(mpLoopCloser);
+        #endif
     }
 
     // Fix verbosity
     Verbose::SetTh(Verbose::VERBOSITY_QUIET);
-
 }
 
 Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas, string filename)

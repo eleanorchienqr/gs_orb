@@ -24,7 +24,7 @@
 #include "Atlas.h"
 #include "LoopClosing.h"
 #include "Tracking.h"
-#include "GaussianMapping.h"
+#include "GaussianViewer.h"
 #include "KeyFrameDatabase.h"
 #include "Settings.h"
 
@@ -36,7 +36,7 @@ namespace ORB_SLAM3
 
 class System;
 class Tracking;
-class GaussianMapping;
+class GaussianViewer;
 class LoopClosing;
 class Atlas;
 
@@ -50,7 +50,7 @@ public:
 
     void SetTracker(Tracking* pTracker);
 
-    void SetGaussianMapper(GaussianMapping* pGaussianMapper);
+    void SetGaussianViewer(GaussianViewer* pGaussianViewer);
 
     // Main function
     void Run();
@@ -164,7 +164,7 @@ protected:
 
     LoopClosing* mpLoopCloser;
     Tracking* mpTracker;
-    GaussianMapping* mpGaussianMapper;
+    GaussianViewer* mpGaussianViewer;
 
     std::list<KeyFrame*> mlNewKeyFrames;
 

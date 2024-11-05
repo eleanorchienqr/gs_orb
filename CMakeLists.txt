@@ -97,7 +97,7 @@ ${SIMPLE_KNN_SOURCES}
 src/System.cc
 src/Tracking.cc
 src/LocalMapping.cc
-src/GaussianMapping.cc
+src/GaussianViewer.cc
 src/LoopClosing.cc
 src/ORBextractor.cc
 src/ORBmatcher.cc
@@ -122,8 +122,6 @@ src/Renderer/Renderer.cpp
 src/Renderer/Shader.cpp
 src/Renderer/VertexArray.cpp
 src/Renderer/VertexBuffer.cpp
-src/Renderer/GaussianRenderer.cpp
-src/Renderer/RenderGUI.cpp
 src/Renderer/Rasterizer.cpp
 src/Renderer/RasterizePoints.cpp
 src/Renderer/GaussianOptimizer.cpp
@@ -139,7 +137,7 @@ src/Settings.cc
 include/System.h
 include/Tracking.h
 include/LocalMapping.h
-include/GaussianMapping.h
+include/GaussianViewer.h
 include/LoopClosing.h
 include/ORBextractor.h
 include/ORBmatcher.h
@@ -166,8 +164,6 @@ include/Renderer/Shader.h
 include/Renderer/VertexArray.h
 include/Renderer/VertexBuffer.h
 include/Renderer/VertexBufferLayout.h
-include/Renderer/GaussianRenderer.h
-include/Renderer/RenderGUI.h
 include/Renderer/debug_utils.h
 include/Renderer/Rasterizer.h
 include/Renderer/RasterizePoints.h

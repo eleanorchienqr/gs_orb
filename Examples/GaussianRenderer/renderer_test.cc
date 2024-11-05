@@ -8,7 +8,6 @@
 #include "VertexArray.h"
 #include "VertexBufferLayout.h"
 #include "Shader.h"
-#include "RenderGUI.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -103,12 +102,12 @@ int main(void)
     ImGui_ImplOpenGL3_Init("#version 460 core");
     ImGui::StyleColorsDark();
 
-    ORB_SLAM3::Test* currentTest = nullptr;
-    ORB_SLAM3::TestMenu* testMenu = new ORB_SLAM3::TestMenu(currentTest);
+    Test* currentTest = nullptr;
+    TestMenu* testMenu = new TestMenu(currentTest);
     currentTest = testMenu;
-    ORB_SLAM3::TestClearColor test;
+    TestClearColor test;
 
-    testMenu->RegisterTest<ORB_SLAM3::TestClearColor>("Clear Color");
+    testMenu->RegisterTest<TestClearColor>("Clear Color");
 
     glm::vec3 translationA(0.4f, 0.4f, 0);
     glm::vec3 translationB(-0.4f, 0.4f, 0);

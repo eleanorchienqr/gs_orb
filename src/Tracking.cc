@@ -1430,9 +1430,9 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
     mpLocalMapper=pLocalMapper;
 }
 
-void Tracking::SetGaussianMapper(GaussianMapping *pGaussianMapper)
+void Tracking::SetGaussianViewer(GaussianViewer *pGaussianViewer)
 {
-    mpGaussianMapper=pGaussianMapper;
+    mpGaussianViewer=pGaussianViewer;
 }
 
 void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)
