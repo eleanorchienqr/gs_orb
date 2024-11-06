@@ -114,8 +114,18 @@ protected:
 
     bool mGUIRedraw = true;
     bool mRenderWindow = false; // open in InitializeWindow; control render or not
-    
+
+    // ImGUI widgets
+    bool mShowMainMenuBar = true;
+
+protected:
     void ImGUIWindowTest();
+
+    void InitializeGLFW();
+    void InitializeImGUI();
+
+    void ShowMenuBar();
+    void ShowWidgets();
 
     // Thread Functions
     // bool CheckFinish();
