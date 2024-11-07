@@ -116,7 +116,16 @@ protected:
     bool mRenderWindow = false; // open in InitializeWindow; control render or not
 
     // ImGUI widgets
-    bool mShowMainMenuBar = true;
+    bool mToolActive = true;
+    bool mFollowCamera = true;
+    bool mFromBehind = true;
+    bool mShowCameraObjects = false;
+    bool mShowActiveWindow = false;
+    bool mShowAxis = false;
+    bool mRenderDepth = false;
+    bool mRenderOpacity = false;
+    bool mRenderTimeShader = false;
+    bool mRenderElpsoidShader = false;
 
 protected:
     void ImGUIWindowTest();

@@ -125,7 +125,7 @@ void GaussianViewer::InitializeImGUI()
 {
     float xscale, yscale;
     glfwGetWindowContentScale(mGLFWindow, &xscale, &yscale);
-    
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -160,170 +160,88 @@ void GaussianViewer::ShowMenuBar()
 
 void GaussianViewer::ShowWidgets()
 {
+    ImGui::Begin("Options and Infos", &mToolActive, ImGuiWindowFlags_MenuBar);
 
-    bool my_tool_active = true;
-    ImGui::Begin("Options", &my_tool_active, ImGuiWindowFlags_MenuBar);
-
-    static bool no_titlebar = false;
-    static bool no_scrollbar = false;
-    static bool no_menu = false;
-    static bool no_move = false;
+    static int clicked = 0;
+    if (ImGui::Button("Pause"))
+        clicked++;
+    if (clicked & 1)
+    {
+        ImGui::SameLine();
+        ImGui::Text("Pause");
+    }
 
     IMGUI_MARKER("ViewPoint Options");
     if (ImGui::CollapsingHeader("ViewPoint Options"))
     {
+
+        ImGui::SeparatorText("Camera Follow Option");
         if (ImGui::BeginTable("split", 3))
         {
-            ImGui::TableNextColumn(); ImGui::Checkbox("No titlebar", &no_titlebar);
-            ImGui::TableNextColumn(); ImGui::Checkbox("No scrollbar", &no_scrollbar);
-            ImGui::TableNextColumn(); ImGui::Checkbox("No menu", &no_menu);
-            ImGui::TableNextColumn(); ImGui::Checkbox("No move", &no_move);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Follow Camera", &mFollowCamera);
+            ImGui::TableNextColumn(); ImGui::Checkbox("From Behind", &mFromBehind);
             ImGui::EndTable();
         }
 
-        IMGUI_MARKER("ViewPoint Options/Camera Follow Option");
-        if (ImGui::TreeNode("ViewPoint Options/Camera Follow Option"))
+
+        ImGui::SeparatorText("ViewPoint List");
+
+        const char* items[] = { "AAAA", "BBBB", "CCCC", "DDDD", "EEEE", "FFFF"};
+        static int item_selected_idx = 0; // Here we store our selected data as an index.
+        static bool item_highlight = false;
+        int item_highlighted_idx = -1; // Here we store our highlighted data as an index.
+
+        if (ImGui::BeginListBox(""))
         {
-            ImGui::TreePop();
+            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+            {
+                const bool is_selected = (item_selected_idx == n);
+                if (ImGui::Selectable(items[n], is_selected))
+                    item_selected_idx = n;
+
+                if (item_highlight && ImGui::IsItemHovered())
+                    item_highlighted_idx = n;
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndListBox();
         }
     }
 
-    // Examples
-    IMGUI_MARKER("Widgets Examples");
-    if (ImGui::CollapsingHeader("Widgets Examples"))
+    IMGUI_MARKER("3D Objects");
+    if (ImGui::CollapsingHeader("3D Objects"))
     {
-        ImGui::SeparatorText("General");
-
-        static int clicked = 0;
-        if (ImGui::Button("Button"))
-            clicked++;
-        if (clicked & 1)
+        if (ImGui::BeginTable("split", 3))
         {
-            ImGui::SameLine();
-            ImGui::Text("Thanks for clicking me!");
-        }
-
-        static bool check = true;
-        ImGui::Checkbox("checkbox", &check);
-
-        static int e = 0;
-        ImGui::RadioButton("radio a", &e, 0); ImGui::SameLine();
-        ImGui::RadioButton("radio b", &e, 1); ImGui::SameLine();
-        ImGui::RadioButton("radio c", &e, 2);
-
-        // Color buttons, demonstrate using PushID() to add unique identifier in the ID stack, and changing style.
-        for (int i = 0; i < 7; i++)
-        {
-            if (i > 0)
-                ImGui::SameLine();
-            ImGui::PushID(i);
-            ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(i / 7.0f, 0.6f, 0.6f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(i / 7.0f, 0.7f, 0.7f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(i / 7.0f, 0.8f, 0.8f));
-            ImGui::Button("Click");
-            ImGui::PopStyleColor(3);
-            ImGui::PopID();
-        }
-
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Hold to repeat:");
-        ImGui::SameLine();
-
-        // Arrow buttons with Repeater
-        static int counter = 0;
-        float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-        ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-        if (ImGui::ArrowButton("##left", ImGuiDir_Left)) { counter--; }
-        ImGui::SameLine(0.0f, spacing);
-        if (ImGui::ArrowButton("##right", ImGuiDir_Right)) { counter++; }
-        ImGui::PopItemFlag();
-        ImGui::SameLine();
-        ImGui::Text("%d", counter);
-
-        ImGui::Button("Tooltip");
-        ImGui::SetItemTooltip("I am a tooltip");
-
-        ImGui::LabelText("label", "Value");
-
-        ImGui::SeparatorText("Inputs");
-
-        {
-            static char str0[128] = "Hello, world!";
-            ImGui::InputText("input text", str0, IM_ARRAYSIZE(str0));
-
-            static char str1[128] = "";
-            ImGui::InputTextWithHint("input text (w/ hint)", "enter text here", str1, IM_ARRAYSIZE(str1));
-
-            static int i0 = 123;
-            ImGui::InputInt("input int", &i0);
-
-            static float f0 = 0.001f;
-            ImGui::InputFloat("input float", &f0, 0.01f, 1.0f, "%.3f");
-
-            static double d0 = 999999.00000001;
-            ImGui::InputDouble("input double", &d0, 0.01f, 1.0f, "%.8f");
-
-            static float f1 = 1.e10f;
-            ImGui::InputFloat("input scientific", &f1, 0.0f, 0.0f, "%e");
-
-            static float vec4a[4] = { 0.10f, 0.20f, 0.30f, 0.44f };
-            ImGui::InputFloat3("input float3", vec4a);
-        }
-
-        ImGui::SeparatorText("Drags");
-
-        {
-            static int i1 = 50, i2 = 42, i3 = 128;
-            ImGui::DragInt("drag int", &i1, 1);
-            ImGui::DragInt("drag int 0..100", &i2, 1, 0, 100, "%d%%", ImGuiSliderFlags_AlwaysClamp);
-            ImGui::DragInt("drag int wrap 100..200", &i3, 1, 100, 200, "%d", ImGuiSliderFlags_WrapAround);
-
-            static float f1 = 1.00f, f2 = 0.0067f;
-            ImGui::DragFloat("drag float", &f1, 0.005f);
-            ImGui::DragFloat("drag small float", &f2, 0.0001f, 0.0f, 0.0f, "%.06f ns");
-        }
-
-        ImGui::SeparatorText("Sliders");
-
-        {
-            static int i1 = 0;
-            ImGui::SliderInt("slider int", &i1, -1, 3);
-
-            static float f1 = 0.123f, f2 = 0.0f;
-            ImGui::SliderFloat("slider float", &f1, 0.0f, 1.0f, "ratio = %.3f");
-            ImGui::SliderFloat("slider float (log)", &f2, -10.0f, 10.0f, "%.4f", ImGuiSliderFlags_Logarithmic);
-
-            static float angle = 0.0f;
-            ImGui::SliderAngle("slider angle", &angle);
-
-            enum Element { Element_Fire, Element_Earth, Element_Air, Element_Water, Element_COUNT };
-            static int elem = Element_Fire;
-            const char* elems_names[Element_COUNT] = { "Fire", "Earth", "Air", "Water" };
-            const char* elem_name = (elem >= 0 && elem < Element_COUNT) ? elems_names[elem] : "Unknown";
-            ImGui::SliderInt("slider enum", &elem, 0, Element_COUNT - 1, elem_name); // Use ImGuiSliderFlags_NoInput flag to disable CTRL+Click here.
-        }
-
-        ImGui::SeparatorText("Selectors/Pickers");
-
-        {
-            static float col1[3] = { 1.0f, 0.0f, 0.2f };
-            static float col2[4] = { 0.4f, 0.7f, 0.0f, 0.5f };
-            ImGui::ColorEdit3("color 1", col1);
-            ImGui::ColorEdit4("color 2", col2);
-        }
-
-        {
-            const char* items[] = { "AAAA", "BBBB", "CCCC", "DDDD", "EEEE", "FFFF", "GGGG", "HHHH", "IIIIIII", "JJJJ", "KKKKKKK" };
-            static int item_current = 0;
-            ImGui::Combo("combo", &item_current, items, IM_ARRAYSIZE(items));
-        }
-
-        {
-            const char* items[] = { "Apple", "Banana", "Cherry", "Kiwi", "Mango", "Orange", "Pineapple", "Strawberry", "Watermelon" };
-            static int item_current = 1;
-            ImGui::ListBox("listbox", &item_current, items, IM_ARRAYSIZE(items), 4);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Cameras", &mShowCameraObjects);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Active Window", &mShowActiveWindow);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Axis", &mShowAxis);
+            ImGui::EndTable();
         }
     }
+
+    IMGUI_MARKER("Render Options");
+    if (ImGui::CollapsingHeader("Render Options"))
+    {
+        if (ImGui::BeginTable("split", 3))
+        {
+            ImGui::TableNextColumn(); ImGui::Checkbox("Depth", &mRenderDepth);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Opacity", &mRenderOpacity);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Time Shader", &mRenderTimeShader);
+            ImGui::TableNextColumn(); ImGui::Checkbox("Elipsoid Shader", &mRenderElpsoidShader);
+            ImGui::EndTable();
+        }
+
+        ImGui::SeparatorText("Gaussian Scale (0-1)");
+
+        {
+            static float f1 = 0.123f, f2 = 0.0f;
+            ImGui::SliderFloat("Scale", &f1, 0.0f, 1.0f, "ratio = %.3f");
+        }
+    }
+    
 }
 
 void GaussianViewer::ImGUIWindowTest()
