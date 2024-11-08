@@ -37,6 +37,7 @@
 #include <Thirdparty/imgui/backends/imgui_impl_opengl3.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <GL/gl.h>
 
 
 namespace ORB_SLAM3
@@ -132,6 +133,10 @@ protected:
 
     void InitializeGLFW();
     void InitializeImGUI();
+
+    void DrawFrameTest(); // Show OpenCV img through OpenGL as texture
+    // Function turn a cv::Mat into a texture, and return the texture ID as a GLuint for use
+    GLuint matToTexture(const cv::Mat &mat, GLenum minFilter, GLenum magFilter, GLenum wrapFilter);
 
     void ShowMenuBar();
     void ShowWidgets();

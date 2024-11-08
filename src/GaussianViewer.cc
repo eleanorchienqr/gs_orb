@@ -25,12 +25,17 @@
 #include "GeometricTools.h"
 
 #include "Rasterizer.h"
+#include "Renderer.h"
+#include "Texture.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
+#include "VertexArray.h"
+#include "VertexBufferLayout.h"
+#include "Shader.h"
+
 
 #include<mutex>
 #include<chrono>
-
-#include "Renderer.h"
-#include <GL/gl.h>
 
 typedef void (*ImGuiMarkerCallback)(const char* file, int line, const char* section, void* user_data);
 extern ImGuiMarkerCallback      GImGuiMarkerCallback;
@@ -69,17 +74,62 @@ void GaussianViewer::Run()
     InitializeGLFW();
     InitializeImGUI();
 
+    // float positions[] = {
+    //     -0.5f, -0.5f, 0.0f, 1.0f,
+    //      0.5f, -0.5f, 1.0f, 0.0f, 
+    //      0.5f,  0.5f, 1.0f, 1.0f,
+    //     -0.5f,  0.5f, 0.0f, 0.0f
+    // };
+
+    float positions[] = {
+        -0.5f, -0.5f, 
+         0.5f, -0.5f, 
+         0.5f,  0.5f, 
+        -0.5f,  0.5f
+    };
+
+    unsigned int indices[] = {
+        0, 1, 2, 
+        2, 3, 0,
+    };
+
+    VertexArray va;
+    VertexBuffer vb(positions, 4 * 2 * sizeof(float));
+
+    VertexBufferLayout layout;
+    // layout.Push<float>(2);  
+    layout.Push<float>(2);  
+    va.AddBuffer(vb, layout);
+
+    IndexBuffer ib(indices, 6);
+
+    // Texture texture("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb/1341847980.722988.png");
+    // texture.Bind();
+
+    Shader shader("/home/ray/Desktop/ORB_SLAM3/src/Renderer/assets");
+    shader.Bind();
+    // shader.SetUnifrom1i("u_Texture", 0);
+    shader.SetUnifrom4f("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
+
+    va.Unbind();
+    vb.Unbind();
+    ib.Unbind();
+    shader.Unbind();
+    Renderer renderer;
+
     while (!glfwWindowShouldClose(mGLFWindow)) 
     {
-        glClear(GL_COLOR_BUFFER_BIT);
+        // glClear(GL_COLOR_BUFFER_BIT);
+        renderer.Clear();
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        // ImGUIWindowTest();
 
-        IMGUI_CHECKVERSION();
-        ShowMenuBar();
-        ShowWidgets();
+        // ShowMenuBar();
+        // ShowWidgets();
+
+        renderer.Draw(va, ib, shader);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -88,11 +138,15 @@ void GaussianViewer::Run()
         glfwPollEvents();
     }
 
-    while(1)
-    {
+    // while(1)
+    // {
 
         
-    }
+    // }
+
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwTerminate();
 }
 
 void GaussianViewer::InitializeGLFW()
@@ -101,10 +155,10 @@ void GaussianViewer::InitializeGLFW()
         throw std::runtime_error{"GLFW could not be initialized."};
     }  
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
     mGLFWindow = glfwCreateWindow(mWindowSizeWidth, mWindowSizeHeight, "Gaussian Render View", NULL, NULL);
     if (mGLFWindow == NULL) {
@@ -117,7 +171,10 @@ void GaussianViewer::InitializeGLFW()
         throw std::runtime_error{"GLEW could not be initialized."};
     }
     
-    glfwSwapInterval(0); // Disable vsync
+    glfwSwapInterval(1); 
+
+    GLCall(glEnable(GL_BLEND));
+    GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 }
 
     
@@ -139,6 +196,85 @@ void GaussianViewer::InitializeImGUI()
     ImFontConfig font_cfg;
     font_cfg.SizePixels = 13.0f * xscale;
     io.Fonts->AddFontDefault(&font_cfg);
+}
+
+void GaussianViewer::DrawFrameTest()
+{
+    cv::Mat TestImg = cv::imread("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb/1341847980.722988.png");
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);     // Operate on model-view matrix
+
+    glEnable(GL_TEXTURE_2D);
+    GLuint image_tex = matToTexture(TestImg, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_CLAMP);
+
+    /* Draw a quad */
+    glBegin(GL_QUADS);
+    glTexCoord2i(0, 0); glVertex2i(0,   0);
+    glTexCoord2i(0, 1); glVertex2i(0,   mWindowSizeHeight);
+    glTexCoord2i(1, 1); glVertex2i(mWindowSizeWidth, mWindowSizeHeight);
+    glTexCoord2i(1, 0); glVertex2i(mWindowSizeWidth, 0);
+    glEnd();
+
+    glDeleteTextures(1, &image_tex);
+    glDisable(GL_TEXTURE_2D);
+}
+
+GLuint GaussianViewer::matToTexture(const cv::Mat &mat, GLenum minFilter, GLenum magFilter, GLenum wrapFilter)
+{
+    // Generate a number for our textureID's unique handle
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+
+    // Bind to our texture handle
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // // Catch silly-mistake texture interpolation method for magnification
+    // if (magFilter == GL_LINEAR_MIPMAP_LINEAR  ||
+    //         magFilter == GL_LINEAR_MIPMAP_NEAREST ||
+    //         magFilter == GL_NEAREST_MIPMAP_LINEAR ||
+    //         magFilter == GL_NEAREST_MIPMAP_NEAREST)
+    // {
+    //     cout << "You can't use MIPMAPs for magnification - setting filter to GL_LINEAR" << endl;
+    //     magFilter = GL_LINEAR;
+    // }
+
+    // // Set texture interpolation methods for minification and magnification
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
+
+    // Set texture clamping method
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapFilter);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapFilter);
+
+    // use fast 4-byte alignment (default anyway) if possible
+    // glPixelStorei(GL_UNPACK_ALIGNMENT, (mat.step & 3) ? 1 : 4);
+    // glPixelStorei(GL_UNPACK_ROW_LENGTH, mat.step/mat.elemSize());
+
+    cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+    cv::flip(mat, mat, -1);
+
+    // Create the texture
+    glTexImage2D(GL_TEXTURE_2D,     // Type of texture
+                 0,                 // Pyramid level (for mip-mapping) - 0 is the top level
+                 GL_RGB,            // Internal colour format to convert to
+                 mat.cols,          // Image width  i.e. 640 for Kinect in standard mode
+                 mat.rows,          // Image height i.e. 480 for Kinect in standard mode
+                 0,                 // Border width in pixels (can either be 1 or 0)
+                 GL_RGB,            // Input image format (i.e. GL_RGB, GL_RGBA, GL_BGR etc.)
+                 GL_UNSIGNED_BYTE,  // Image data type
+                 mat.ptr());        // The actual image data itself
+
+    // If we're using mipmaps then generate them. Note: This requires OpenGL 3.0 or higher
+    // if (minFilter == GL_LINEAR_MIPMAP_LINEAR  ||
+    //         minFilter == GL_LINEAR_MIPMAP_NEAREST ||
+    //         minFilter == GL_NEAREST_MIPMAP_LINEAR ||
+    //         minFilter == GL_NEAREST_MIPMAP_NEAREST)
+    // {
+    //     glGenerateMipmap(GL_TEXTURE_2D);
+    // }
+
+    return textureID;
 }
 
 void GaussianViewer::ShowMenuBar()

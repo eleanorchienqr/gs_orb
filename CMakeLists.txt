@@ -117,6 +117,7 @@ src/ImuTypes.cc
 src/G2oTypes.cc
 src/CameraModels/Pinhole.cpp
 src/CameraModels/KannalaBrandt8.cpp
+src/Renderer/Texture.cpp
 src/Renderer/IndexBuffer.cpp
 src/Renderer/Renderer.cpp
 src/Renderer/Shader.cpp
@@ -158,6 +159,7 @@ include/G2oTypes.h
 include/CameraModels/GeometricCamera.h
 include/CameraModels/Pinhole.h
 include/CameraModels/KannalaBrandt8.h
+include/Renderer/Texture.h
 include/Renderer/IndexBuffer.h
 include/Renderer/Renderer.h
 include/Renderer/Shader.h
