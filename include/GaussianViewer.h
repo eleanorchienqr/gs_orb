@@ -101,7 +101,7 @@ protected:
     // bool Stop();
 
     // 1/fps in ms
-    double mT;
+    double mT = 1e3;
     float mImageWidth, mImageHeight;
     float mImageViewerScale;
 
@@ -134,9 +134,7 @@ protected:
     void InitializeGLFW();
     void InitializeImGUI();
 
-    void DrawFrameTest(); // Show OpenCV img through OpenGL as texture
-    // Function turn a cv::Mat into a texture, and return the texture ID as a GLuint for use
-    GLuint matToTexture(const cv::Mat &mat, GLenum minFilter, GLenum magFilter, GLenum wrapFilter);
+    void LoadImages(const std::string &strFile, std::vector<std::string> &vstrImageFilenames, std::vector<double> &vTimestamps);
 
     void ShowMenuBar();
     void ShowWidgets();

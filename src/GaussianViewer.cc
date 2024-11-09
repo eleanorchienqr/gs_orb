@@ -96,13 +96,9 @@ void GaussianViewer::Run()
 
     IndexBuffer ib(indices, 6);
 
-    Texture texture("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb/1341847980.722988.png");
-    texture.Bind();
-
     Shader shader("/home/ray/Desktop/ORB_SLAM3/src/Renderer/assets");
     shader.Bind();
     shader.SetUnifrom1i("u_Texture", 0);
-    // shader.SetUnifrom4f("u_Color", 0.4f, 0.7f, 0.2f, 1.0f);
 
     va.Unbind();
     vb.Unbind();
@@ -110,32 +106,44 @@ void GaussianViewer::Run()
     shader.Unbind();
     Renderer renderer;
 
+    int Frame = 0;
+
+    // Retrieve paths to images
+    vector<string> vstrImageFilenames;
+    vector<double> vTimestamps;
+    string strFile = "/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb.txt";
+    LoadImages(strFile, vstrImageFilenames, vTimestamps);
+
     while (!glfwWindowShouldClose(mGLFWindow)) 
     {
-        // glClear(GL_COLOR_BUFFER_BIT);
-        renderer.Clear();
+        while(1)
+        {
+            renderer.Clear();
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
 
-        ShowMenuBar();
-        ShowWidgets();
+            ShowMenuBar();
+            ShowWidgets();
 
-        renderer.Draw(va, ib, shader);
+            int numFrame = Frame % vstrImageFilenames.size();
+            Texture texture("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/"+vstrImageFilenames[numFrame]);
+            texture.Bind();
 
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            renderer.Draw(va, ib, shader);
 
-        glfwSwapBuffers(mGLFWindow);
-        glfwPollEvents();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            glfwSwapBuffers(mGLFWindow);
+            glfwPollEvents();
+
+            texture.Unbind();
+            usleep(mT);
+            Frame++;
+        }
     }
-
-    // while(1)
-    // {
-
-        
-    // }
 
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -184,85 +192,6 @@ void GaussianViewer::InitializeImGUI()
     ImFontConfig font_cfg;
     font_cfg.SizePixels = 13.0f * xscale;
     io.Fonts->AddFontDefault(&font_cfg);
-}
-
-void GaussianViewer::DrawFrameTest()
-{
-    cv::Mat TestImg = cv::imread("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb/1341847980.722988.png");
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glMatrixMode(GL_MODELVIEW);     // Operate on model-view matrix
-
-    glEnable(GL_TEXTURE_2D);
-    GLuint image_tex = matToTexture(TestImg, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_CLAMP);
-
-    /* Draw a quad */
-    glBegin(GL_QUADS);
-    glTexCoord2i(0, 0); glVertex2i(0,   0);
-    glTexCoord2i(0, 1); glVertex2i(0,   mWindowSizeHeight);
-    glTexCoord2i(1, 1); glVertex2i(mWindowSizeWidth, mWindowSizeHeight);
-    glTexCoord2i(1, 0); glVertex2i(mWindowSizeWidth, 0);
-    glEnd();
-
-    glDeleteTextures(1, &image_tex);
-    glDisable(GL_TEXTURE_2D);
-}
-
-GLuint GaussianViewer::matToTexture(const cv::Mat &mat, GLenum minFilter, GLenum magFilter, GLenum wrapFilter)
-{
-    // Generate a number for our textureID's unique handle
-    GLuint textureID;
-    glGenTextures(1, &textureID);
-
-    // Bind to our texture handle
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // // Catch silly-mistake texture interpolation method for magnification
-    // if (magFilter == GL_LINEAR_MIPMAP_LINEAR  ||
-    //         magFilter == GL_LINEAR_MIPMAP_NEAREST ||
-    //         magFilter == GL_NEAREST_MIPMAP_LINEAR ||
-    //         magFilter == GL_NEAREST_MIPMAP_NEAREST)
-    // {
-    //     cout << "You can't use MIPMAPs for magnification - setting filter to GL_LINEAR" << endl;
-    //     magFilter = GL_LINEAR;
-    // }
-
-    // // Set texture interpolation methods for minification and magnification
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
-
-    // Set texture clamping method
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapFilter);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapFilter);
-
-    // use fast 4-byte alignment (default anyway) if possible
-    // glPixelStorei(GL_UNPACK_ALIGNMENT, (mat.step & 3) ? 1 : 4);
-    // glPixelStorei(GL_UNPACK_ROW_LENGTH, mat.step/mat.elemSize());
-
-    cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-    cv::flip(mat, mat, -1);
-
-    // Create the texture
-    glTexImage2D(GL_TEXTURE_2D,     // Type of texture
-                 0,                 // Pyramid level (for mip-mapping) - 0 is the top level
-                 GL_RGB,            // Internal colour format to convert to
-                 mat.cols,          // Image width  i.e. 640 for Kinect in standard mode
-                 mat.rows,          // Image height i.e. 480 for Kinect in standard mode
-                 0,                 // Border width in pixels (can either be 1 or 0)
-                 GL_RGB,            // Input image format (i.e. GL_RGB, GL_RGBA, GL_BGR etc.)
-                 GL_UNSIGNED_BYTE,  // Image data type
-                 mat.ptr());        // The actual image data itself
-
-    // If we're using mipmaps then generate them. Note: This requires OpenGL 3.0 or higher
-    // if (minFilter == GL_LINEAR_MIPMAP_LINEAR  ||
-    //         minFilter == GL_LINEAR_MIPMAP_NEAREST ||
-    //         minFilter == GL_NEAREST_MIPMAP_LINEAR ||
-    //         minFilter == GL_NEAREST_MIPMAP_NEAREST)
-    // {
-    //     glGenerateMipmap(GL_TEXTURE_2D);
-    // }
-
-    return textureID;
 }
 
 void GaussianViewer::ShowMenuBar()
@@ -400,5 +329,35 @@ void GaussianViewer::ImGUIWindowTest()
     ImGui::EndChild();
     ImGui::End();
 }
+
+void GaussianViewer::LoadImages(const std::string &strFile, std::vector<std::string> &vstrImageFilenames, std::vector<double> &vTimestamps)
+{
+    ifstream f;
+    f.open(strFile.c_str());
+
+    // skip first three lines
+    string s0;
+    getline(f,s0);
+    getline(f,s0);
+    getline(f,s0);
+
+    while(!f.eof())
+    {
+        string s;
+        getline(f,s);
+        if(!s.empty())
+        {
+            stringstream ss;
+            ss << s;
+            double t;
+            string sRGB;
+            ss >> t;
+            vTimestamps.push_back(t);
+            ss >> sRGB;
+            vstrImageFilenames.push_back(sRGB);
+        }
+    }
+}
+
 
 } //namespace ORB_SLAM

@@ -15,9 +15,6 @@ Texture::Texture(const std::string& path)
 
     mLocalBuffer = TestImg.ptr(); 
 
-    cv::imwrite("TestImg.jpg", TestImg);
-    std::cout << "[GLFW Test] mWidth: " << mWidth << "; mHeight: " << mHeight << "; mChannels: " << mChannels << std::endl;
-
     GLCall(glGenTextures(1, &mRendererID));
     GLCall(glBindTexture(GL_TEXTURE_2D, mRendererID));
 
