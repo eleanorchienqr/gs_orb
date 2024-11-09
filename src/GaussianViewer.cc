@@ -74,18 +74,11 @@ void GaussianViewer::Run()
     InitializeGLFW();
     InitializeImGUI();
 
-    // float positions[] = {
-    //     -0.5f, -0.5f, 0.0f, 1.0f,
-    //      0.5f, -0.5f, 1.0f, 0.0f, 
-    //      0.5f,  0.5f, 1.0f, 1.0f,
-    //     -0.5f,  0.5f, 0.0f, 0.0f
-    // };
-
     float positions[] = {
-        -0.5f, -0.5f, 
-         0.5f, -0.5f, 
-         0.5f,  0.5f, 
-        -0.5f,  0.5f
+        -0.5f, -0.5f, 0.0f, 0.0f, //0
+         0.5f, -0.5f, 1.0f, 0.0f, //1
+         0.5f,  0.5f, 1.0f, 1.0f, //2
+        -0.5f,  0.5f, 0.0f, 1.0f  //3
     };
 
     unsigned int indices[] = {
@@ -94,22 +87,22 @@ void GaussianViewer::Run()
     };
 
     VertexArray va;
-    VertexBuffer vb(positions, 4 * 2 * sizeof(float));
+    VertexBuffer vb(positions, 4 * 4 * sizeof(float));
 
     VertexBufferLayout layout;
-    // layout.Push<float>(2);  
+    layout.Push<float>(2);  
     layout.Push<float>(2);  
     va.AddBuffer(vb, layout);
 
     IndexBuffer ib(indices, 6);
 
-    // Texture texture("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb/1341847980.722988.png");
-    // texture.Bind();
+    Texture texture("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb/1341847980.722988.png");
+    texture.Bind();
 
     Shader shader("/home/ray/Desktop/ORB_SLAM3/src/Renderer/assets");
     shader.Bind();
-    // shader.SetUnifrom1i("u_Texture", 0);
-    shader.SetUnifrom4f("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
+    shader.SetUnifrom1i("u_Texture", 0);
+    // shader.SetUnifrom4f("u_Color", 0.4f, 0.7f, 0.2f, 1.0f);
 
     va.Unbind();
     vb.Unbind();
@@ -126,8 +119,8 @@ void GaussianViewer::Run()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // ShowMenuBar();
-        // ShowWidgets();
+        ShowMenuBar();
+        ShowWidgets();
 
         renderer.Draw(va, ib, shader);
 
@@ -154,11 +147,6 @@ void GaussianViewer::InitializeGLFW()
     if (!glfwInit()) {
         throw std::runtime_error{"GLFW could not be initialized."};
     }  
-
-    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
     mGLFWindow = glfwCreateWindow(mWindowSizeWidth, mWindowSizeHeight, "Gaussian Render View", NULL, NULL);
     if (mGLFWindow == NULL) {

@@ -3,14 +3,20 @@
 Texture::Texture(const std::string& path)
     :mRendererID(0), mFilePath(path), mLocalBuffer(nullptr), mWidth(0), mHeight(0), mChannels(0)
 {
-    cv::Mat TestImg = cv::imread(mFilePath);
-    cv::cvtColor(TestImg, TestImg, cv::COLOR_BGR2RGB);
-    cv::flip(TestImg, TestImg, -1);
+    cv::Mat TestImg = cv::imread(mFilePath); // BGR order
+    
+    // cv::cvtColor(TestImg, TestImg, cv::COLOR_BGR2RGB);
+    cv::flip(TestImg, TestImg, 0);
 
-    mLocalBuffer = TestImg.ptr();
+    // mLocalBuffer = TestImg.ptr();
     mWidth = TestImg.cols;
     mHeight = TestImg.rows;
     mChannels = TestImg.channels();
+
+    mLocalBuffer = TestImg.ptr(); 
+
+    cv::imwrite("TestImg.jpg", TestImg);
+    std::cout << "[GLFW Test] mWidth: " << mWidth << "; mHeight: " << mHeight << "; mChannels: " << mChannels << std::endl;
 
     GLCall(glGenTextures(1, &mRendererID));
     GLCall(glBindTexture(GL_TEXTURE_2D, mRendererID));
@@ -22,16 +28,17 @@ Texture::Texture(const std::string& path)
 
     GLCall(glTexImage2D(GL_TEXTURE_2D,        // Type of texture
                         0,                    // Pyramid level (for mip-mapping) - 0 is the top level
-                        GL_RGB,               // Internal colour format to convert to
+                        GL_RGB8,              // Internal colour format to convert to
                         mWidth,               // Image width  i.e. 640 for Kinect in standard mode
                         mHeight,              // Image height i.e. 480 for Kinect in standard mode
                         0,                    // Border width in pixels (can either be 1 or 0)
-                        GL_RGB,               // Input image format (i.e. GL_RGB, GL_RGBA, GL_BGR etc.)
+                        GL_BGR,               // Input image format (i.e. GL_RGB, GL_RGBA, GL_BGR etc.)
                         GL_UNSIGNED_BYTE,     // Image data type
                         mLocalBuffer)         // The actual image data itself
     );
-    GLCall(glBindTexture(GL_TEXTURE_2D, 0));
 
+    GLCall(glGenerateMipmap(GL_TEXTURE_2D));
+    // GLCall(glBindTexture(GL_TEXTURE_2D, 0));
 }
 
 Texture::~Texture()
