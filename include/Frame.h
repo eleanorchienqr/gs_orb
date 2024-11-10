@@ -162,7 +162,8 @@ public:
         return mbHasVelocity;
     }
 
-
+    // Gaussian Getter
+    void GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy);
 
 private:
     //Sophus/Eigen migration

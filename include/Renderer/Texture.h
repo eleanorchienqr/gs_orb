@@ -11,6 +11,8 @@ private:
 
 public:
     Texture(const std::string& path);
+    Texture(cv::Mat Img);
+    
     ~Texture();
 
     void Bind(unsigned int slot = 0) const;

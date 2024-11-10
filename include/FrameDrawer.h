@@ -23,9 +23,11 @@
 #include "Tracking.h"
 #include "MapPoint.h"
 #include "Atlas.h"
+#include "Converter.h"
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
+#include<torch/torch.h>
 
 #include<mutex>
 #include <unordered_set>
@@ -49,6 +51,10 @@ public:
     // Draw last processed frame.
     cv::Mat DrawFrame(float imageScale=1.f);
     cv::Mat DrawRightFrame(float imageScale=1.f);
+    cv::Mat DrawGaussianFrame();
+
+    torch::Tensor GetFrameProjMatrix(const float TanFovx, const float TanFovy, const float Near, const float Far);
+    torch::Tensor GetViewMatrix(Sophus::SE3<float> &Tcw);
 
     bool both;
 
@@ -58,6 +64,7 @@ protected:
 
     // Info of the frame to be drawn
     cv::Mat mIm, mImRight;
+    cv::Mat mImOrigin;
     int N;
     vector<cv::KeyPoint> mvCurrentKeys,mvCurrentKeysRight;
     vector<bool> mvbMap, mvbVO;

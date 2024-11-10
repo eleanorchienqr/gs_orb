@@ -5600,7 +5600,7 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
 {
     ORB_SLAM3::OptimizationParameters OptimParams;
     GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
-    optimizer.InitializeOptimizationUpdate(vpKFs, vpMP, bInitializeScale);
+    optimizer.InitializeOptimization(vpKFs, vpMP, bInitializeScale);
     optimizer.Optimize();
 
     // Recover optimized data

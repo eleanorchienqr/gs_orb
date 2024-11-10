@@ -55,7 +55,7 @@ public:
     // constructer
     GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &OptimParams);
 
-    void InitializeOptimizationUpdate(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale);
+    void InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale);
     void TrainingSetup();
     void Optimize();
 

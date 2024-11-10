@@ -208,25 +208,6 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     else
         mpLocalMapper->mbFarPoints = false;
 
-    //Initialize the Gaussian Renderer thread and launch
-    // #ifdef GAUSSIANSPLATTING
-    // mpGaussianViewer = new GaussianViewer(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
-    //                                     mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
-    // mptGaussianViewer = new thread(&ORB_SLAM3::GaussianViewer::Run,mpGaussianViewer);
-    // mpGaussianViewer->mInitFr = initFr;
-    // if(settings_)
-    //     mpGaussianViewer->mThFarPoints = settings_->thFarPoints();
-    // else
-    //     mpGaussianViewer->mThFarPoints = fsSettings["thFarPoints"];
-    // if(mpGaussianViewer->mThFarPoints!=0)
-    // {
-    //     cout << "Discard gaussians further than " << mpGaussianViewer->mThFarPoints << " m from current camera" << endl;
-    //     mpGaussianViewer->mbFarPoints = true;
-    // }
-    // else
-    //     mpGaussianViewer->mbFarPoints = false;
-    // #endif
-
     //Initialize the Loop Closing thread and launch
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
     mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);
@@ -257,17 +238,10 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpViewer->both = mpFrameDrawer->both;
 
         #ifdef GAUSSIANSPLATTING
-        mpGaussianViewer = new GaussianViewer(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
-                                        mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
+        mpGaussianViewer = new GaussianViewer(this, mpFrameDrawer,mpMapDrawer,mpTracker);
         mptGaussianViewer = new thread(&ORB_SLAM3::GaussianViewer::Run,mpGaussianViewer);
 
         mpTracker->SetGaussianViewer(mpGaussianViewer);
-        mpLocalMapper->SetGaussianViewer(mpGaussianViewer);
-        // mpLoopCloser->SetGaussianViewer(mpGaussianViewer);
-
-        mpGaussianViewer->SetTracker(mpTracker);
-        mpGaussianViewer->SetLocalMapper(mpLocalMapper);
-        // mpGaussianViewer->SetLoopClosing(mpLoopCloser);
         #endif
     }
 

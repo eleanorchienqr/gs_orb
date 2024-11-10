@@ -141,6 +141,7 @@ public:
     Frame mCurrentFrame;
     Frame mLastFrame;
 
+    cv::Mat mImOrigin;
     cv::Mat mImGray;
 
     // Initialization Variables (Monocular)

@@ -1571,6 +1571,7 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
 
 Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename)
 {
+    mImOrigin = im;
     mImGray = im;
 
     if(mImGray.channels()==3)

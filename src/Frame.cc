@@ -1255,4 +1255,13 @@ Eigen::Vector3f Frame::UnprojectStereoFishEye(const int &i){
     return mRwc * mvStereo3Dpoints[i] + mOw;
 }
 
+void Frame::GetGaussianRenderParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy)
+{
+    ImWidth = mImRGB.cols;
+    ImHeight = mImRGB.rows;
+
+    TanFovx = std::tan(Converter::Focal2Fov(fx, ImWidth) * 0.5f);
+    TanFovy = std::tan(Converter::Focal2Fov(fy, ImHeight) * 0.5f);
+}
+
 } //namespace ORB_SLAM

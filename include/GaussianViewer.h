@@ -25,6 +25,8 @@
 #include "LocalMapping.h"
 #include "LoopClosing.h"
 #include "Tracking.h"
+#include "MapDrawer.h"
+#include "FrameDrawer.h"
 #include "KeyFrameDatabase.h"
 #include "Settings.h"
 #include "Config.h"
@@ -48,12 +50,13 @@ class Tracking;
 class LoopClosing;
 class LocalMapping;
 class Atlas;
+class FrameDrawer;
+class MapDrawer;
 
 class GaussianViewer
 {
 public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    GaussianViewer(System* pSys, Atlas* pAtlas, const float bMonocular, bool bInertial, const string &_strSeqName=std::string());
+    GaussianViewer(System* pSystem, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Tracking *pTracking);
 
     void SetLoopCloser(LoopClosing* pLoopCloser);
     void SetTracker(Tracking* pTracker);
@@ -88,6 +91,8 @@ protected:
 
     System *mpSystem;
     Atlas* mpAtlas;
+    FrameDrawer* mpFrameDrawer;
+    MapDrawer* mpMapDrawer;
 
     bool mbMonocular;
     bool mbInertial;
@@ -108,8 +113,8 @@ protected:
     float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
 
     // Window settings
-    const int mWindowSizeWidth = 1200;
-    const int mWindowSizeHeight = 800;
+    const int mWindowSizeWidth = 1600;
+    const int mWindowSizeHeight = 1200;
 
     GLFWwindow* mGLFWindow = nullptr;
 
@@ -128,13 +133,21 @@ protected:
     bool mRenderTimeShader = false;
     bool mRenderElpsoidShader = false;
 
+    // Thread management
+    bool mbFinishRequested;
+    bool mbFinished;
+    bool mbStopped;
+    bool mbStopRequested;
+
+    // std::mutex mMutexFinish;
+    // std::mutex mMutexStop;
+    // bool mbStopTrack;
+
 protected:
     void ImGUIWindowTest();
 
     void InitializeGLFW();
     void InitializeImGUI();
-
-    void LoadImages(const std::string &strFile, std::vector<std::string> &vstrImageFilenames, std::vector<double> &vTimestamps);
 
     void ShowMenuBar();
     void ShowWidgets();
@@ -142,15 +155,6 @@ protected:
     // Thread Functions
     // bool CheckFinish();
     // void SetFinish();
-    // bool mbFinishRequested;
-    // bool mbFinished;
-    // std::mutex mMutexFinish;
-
-    // bool mbStopped;
-    // bool mbStopRequested;
-    // std::mutex mMutexStop;
-
-    // bool mbStopTrack;
 
 };
 

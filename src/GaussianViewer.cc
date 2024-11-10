@@ -47,10 +47,12 @@ void*                               GImGuiMarkerCallbackUserData = NULL;
 namespace ORB_SLAM3
 {
 
-GaussianViewer::GaussianViewer(System* pSys, Atlas *pAtlas, const float bMonocular, bool bInertial, const string &_strSeqName):
-    mpSystem(pSys), mbMonocular(bMonocular), mbInertial(bInertial)
+
+GaussianViewer::GaussianViewer(System* pSystem, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Tracking *pTracking):
+    mpSystem(pSystem), mpFrameDrawer(pFrameDrawer),mpMapDrawer(pMapDrawer), mpTracker(pTracking),
+    mbFinishRequested(false), mbFinished(true), mbStopped(true), mbStopRequested(false)
 {
-    
+
 }
 
 void GaussianViewer::SetLoopCloser(LoopClosing* pLoopCloser)
@@ -70,15 +72,18 @@ void GaussianViewer::SetTracker(Tracking *pTracker)
 
 void GaussianViewer::Run()
 {
+    mbFinished = false;
+    mbStopped = false;
+
     // std::cout << ">>>>>>>>Start Gaussian Rendering " << std::endl;
     InitializeGLFW();
     InitializeImGUI();
 
     float positions[] = {
-        -0.5f, -0.5f, 0.0f, 0.0f, //0
-         0.5f, -0.5f, 1.0f, 0.0f, //1
-         0.5f,  0.5f, 1.0f, 1.0f, //2
-        -0.5f,  0.5f, 0.0f, 1.0f  //3
+        -1.0f, -1.0f, 0.0f, 0.0f, //0
+         1.0f, -1.0f, 1.0f, 0.0f, //1
+         1.0f,  1.0f, 1.0f, 1.0f, //2
+        -1.0f,  1.0f, 0.0f, 1.0f  //3
     };
 
     unsigned int indices[] = {
@@ -106,14 +111,6 @@ void GaussianViewer::Run()
     shader.Unbind();
     Renderer renderer;
 
-    int Frame = 0;
-
-    // Retrieve paths to images
-    vector<string> vstrImageFilenames;
-    vector<double> vTimestamps;
-    string strFile = "/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/rgb.txt";
-    LoadImages(strFile, vstrImageFilenames, vTimestamps);
-
     while (!glfwWindowShouldClose(mGLFWindow)) 
     {
         while(1)
@@ -127,8 +124,8 @@ void GaussianViewer::Run()
             ShowMenuBar();
             ShowWidgets();
 
-            int numFrame = Frame % vstrImageFilenames.size();
-            Texture texture("/home/ray/Desktop/Dataset/TUM/rgbd_dataset_freiburg3_long_office_household/"+vstrImageFilenames[numFrame]);
+            cv::Mat pGaussianFrame = mpFrameDrawer->DrawGaussianFrame();
+            Texture texture(pGaussianFrame);
             texture.Bind();
 
             renderer.Draw(va, ib, shader);
@@ -141,7 +138,6 @@ void GaussianViewer::Run()
 
             texture.Unbind();
             usleep(mT);
-            Frame++;
         }
     }
 
@@ -329,35 +325,5 @@ void GaussianViewer::ImGUIWindowTest()
     ImGui::EndChild();
     ImGui::End();
 }
-
-void GaussianViewer::LoadImages(const std::string &strFile, std::vector<std::string> &vstrImageFilenames, std::vector<double> &vTimestamps)
-{
-    ifstream f;
-    f.open(strFile.c_str());
-
-    // skip first three lines
-    string s0;
-    getline(f,s0);
-    getline(f,s0);
-    getline(f,s0);
-
-    while(!f.eof())
-    {
-        string s;
-        getline(f,s);
-        if(!s.empty())
-        {
-            stringstream ss;
-            ss << s;
-            double t;
-            string sRGB;
-            ss >> t;
-            vTimestamps.push_back(t);
-            ss >> sRGB;
-            vstrImageFilenames.push_back(sRGB);
-        }
-    }
-}
-
 
 } //namespace ORB_SLAM

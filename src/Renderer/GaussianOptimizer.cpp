@@ -38,7 +38,7 @@ GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &Op
 
 }
 
-void GaussianOptimizer::InitializeOptimizationUpdate(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale)
+void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale)
 {
 
     const int FeaturestDim = std::pow(mSHDegree + 1, 2) - 1;

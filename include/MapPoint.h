@@ -136,6 +136,7 @@ public:
     torch::Tensor GetGauOpacity();
     torch::Tensor GetGauFeatureDC();
     torch::Tensor GetGauFeaturest();
+    inline long unsigned int GetGauSHDegree() {return mGauSHDegree;}
 
     Eigen::Vector3f GetNormal();
     void SetNormalVector(const Eigen::Vector3f& normal);
