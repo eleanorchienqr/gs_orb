@@ -75,6 +75,9 @@ public:
     Sophus::SE3f GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp, string filename);
     Sophus::SE3f GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename);
 
+    // Gaussian associated
+    Sophus::SE3f GrabImageMonocularGS(const cv::Mat &im, const double &timestamp, string filename);
+
     void GrabImuData(const IMU::Point &imuMeasurement);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
@@ -200,6 +203,10 @@ protected:
 
     // Main tracking function. It is independent of the input sensor.
     void Track();
+
+    //Gaussian associated
+    void TrackWithGS();
+    bool TrackLocalMapGS();
 
     // Map initialization for stereo and RGB-D
     void StereoInitialization();
