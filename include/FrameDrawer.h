@@ -55,6 +55,8 @@ public:
 
     torch::Tensor GetFrameProjMatrix(const float TanFovx, const float TanFovy, const float Near, const float Far);
     torch::Tensor GetViewMatrix(Sophus::SE3<float> &Tcw);
+    cv::Mat TensorToCVMat(torch::Tensor tensor);
+    cv::Mat CombindImages(const cv::Mat Img1, const cv::Mat Img2);
 
     bool both;
 
