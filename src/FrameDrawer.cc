@@ -383,7 +383,8 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
                 int GaussianClusterNum = pMP->GetGaussianNum();
                 if(GaussianClusterNum)
                 {
-                    // std::cout << "[FrameDrawer] Means3D Check " << Means3D << std::endl;
+                    std::cout << "[FrameDrawer] GaussianClusterNum Check: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
+                    std::cout << "[FrameDrawer] Means3D Check " << pMP->GetGauOpacity() << std::endl;
                     // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
                     // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
                     Means3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
@@ -392,10 +393,8 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
                     Rotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
                     FeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
                     FeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
-
                     GaussianClusterIndex += GaussianClusterNum;
                 }
-                
             }
         }
 
@@ -405,10 +404,10 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
 
         currentFrame.GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
 
-        std::cout << "[FrameDrawer] mImHeight: " << ImHeight << std::endl;
-        std::cout << "[FrameDrawer] mImWidth: " << ImWidth << std::endl;
-        std::cout << "[FrameDrawer] mTanFovx: " << TanFovx << std::endl;
-        std::cout << "[FrameDrawer] mTanFovy: " << TanFovy << std::endl;
+        // std::cout << "[FrameDrawer] mImHeight: " << ImHeight << std::endl;
+        // std::cout << "[FrameDrawer] mImWidth: " << ImWidth << std::endl;
+        // std::cout << "[FrameDrawer] mTanFovx: " << TanFovx << std::endl;
+        // std::cout << "[FrameDrawer] mTanFovy: " << TanFovy << std::endl;
         torch::Tensor ProjMatrix = GetFrameProjMatrix(TanFovx, TanFovy, 0.01f, 100.0f);
 
         Sophus::SE3<float> Tcw = currentFrame.GetPose();
@@ -416,8 +415,8 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
         torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(ProjMatrix.unsqueeze(0)).squeeze(0);
         torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
 
-        std::cout << "[FrameDrawer] ProjMatrix: "<< ProjMatrix << std::endl;
-        std::cout << "[FrameDrawer] ViewMatrix: "<< ViewMatrix << std::endl;
+        // std::cout << "[FrameDrawer] ProjMatrix: "<< ProjMatrix << std::endl;
+        // std::cout << "[FrameDrawer] ViewMatrix: "<< ViewMatrix << std::endl;
 
 
         GaussianRasterizationSettings raster_settings = {

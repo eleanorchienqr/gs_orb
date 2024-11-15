@@ -159,17 +159,17 @@ void MapPoint::ResetGauAttributes(const long GauNum)
         const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
         const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
-        mGauWorldPos = torch::zeros({GauNum, 3}).to(torch::kCUDA); 
-        mGauWorldRot = torch::zeros({GauNum, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA);
-        mGauScale = torch::zeros({GauNum, 3}).to(torch::kCUDA); // Leave scales later in Optimization
-        mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({GauNum, 1})).to(torch::kCUDA);
-        mGauFeaturest = torch::zeros({GauNum, FeaturestDim, 3}).to(torch::kCUDA);
-        mGauFeatureDC = Converter::RGB2SH(torch::zeros({GauNum, 1, 3})).to(torch::kCUDA);
+        mGauWorldPos = torch::zeros({GauNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA); 
+        mGauWorldRot = torch::zeros({GauNum, 4}, torch::dtype(torch::kFloat)).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA);
+        mGauScale = torch::zeros({GauNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA); // Leave scales later in Optimization
+        mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({GauNum, 1}, torch::dtype(torch::kFloat))).to(torch::kCUDA);
+        mGauFeaturest = torch::zeros({GauNum, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+        mGauFeatureDC = Converter::RGB2SH(torch::zeros({GauNum, 1, 3}, torch::dtype(torch::kFloat))).to(torch::kCUDA);
         mGauNum = GauNum;
     }
     else
     {
-        mGauNum = 0;
+        mGauNum = 1;
     }
     
 }

@@ -160,6 +160,21 @@ int main(int argc, char **argv)
 
             vTimesTrack[ni]=ttrack;
 
+    #ifdef GAUSSIANSPLATTING
+            // Wait to load the next frame
+            double T=0;
+            if(ni<nImages[seq]-1)
+                T = vTimestampsCam[seq][ni+1]-tframe;
+            else if(ni>0)
+                T = tframe-vTimestampsCam[seq][ni-1];
+            
+            int pSlowDownTimeScale  = 10;
+            if(ttrack<T*pSlowDownTimeScale) {
+                //std::cout << "usleep: " << (dT-ttrack) << std::endl;
+                usleep((T-ttrack)*1e6); // 1e6
+            }
+
+    #else
             // Wait to load the next frame
             double T=0;
             if(ni<nImages[seq]-1)
@@ -174,6 +189,7 @@ int main(int argc, char **argv)
                 //std::cout << "usleep: " << (dT-ttrack) << std::endl;
                 usleep((T-ttrack)*1e6); // 1e6
             }
+    #endif
         }
 
         if(seq < num_seq - 1)

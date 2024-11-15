@@ -2735,7 +2735,7 @@ void Tracking::TrackWithGS()
         {
             if(bOK)
             {
-                bOK = TrackLocalMap();
+                bOK = TrackLocalMapGS();
             }
             if(!bOK)
                 cout << "Fail to track local map!" << endl;
@@ -2746,7 +2746,7 @@ void Tracking::TrackWithGS()
             // a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
             // the camera we will use the local map again.
             if(bOK && !mbVO)
-                bOK = TrackLocalMap();
+                bOK = TrackLocalMapGS();
         }
 
         if(bOK)
@@ -2852,12 +2852,15 @@ void Tracking::TrackWithGS()
             std::chrono::steady_clock::time_point time_StartNewKF = std::chrono::steady_clock::now();
 #endif
             bool bNeedKF = NeedNewKeyFrame();
+            int bWaitForLocalMapper = 1e7;
 
             // Check if we need to insert a new keyframe
             // if(bNeedKF && bOK)
             if(bNeedKF && (bOK || (mInsertKFsLost && mState==RECENTLY_LOST &&
                                    (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD))))
                 CreateNewKeyFrame();
+            // else if(!bNeedKF && (mSensor == System::MONOCULAR))
+            //     usleep(bWaitForLocalMapper);
 
 #ifdef REGISTER_TIMES
             std::chrono::steady_clock::time_point time_EndNewKF = std::chrono::steady_clock::now();
@@ -3776,7 +3779,6 @@ bool Tracking::TrackLocalMapGS()
     if((mnMatchesInliers>10)&&(mState==RECENTLY_LOST))
         return true;
 
-
     if (mSensor == System::IMU_MONOCULAR)
     {
         if((mnMatchesInliers<15 && mpAtlas->isImuInitialized())||(mnMatchesInliers<50 && !mpAtlas->isImuInitialized()))
@@ -3797,6 +3799,7 @@ bool Tracking::TrackLocalMapGS()
     }
     else
     {
+        std::cout << "[TrackLocalMap Test 6] mnMatchesInliers " << mCurrentFrame.mnId << std::endl;
         if(mnMatchesInliers<30)
             return false;
         else
