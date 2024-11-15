@@ -383,8 +383,8 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
                 int GaussianClusterNum = pMP->GetGaussianNum();
                 if(GaussianClusterNum)
                 {
-                    std::cout << "[FrameDrawer] GaussianClusterNum Check: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
-                    std::cout << "[FrameDrawer] Means3D Check " << pMP->GetGauOpacity() << std::endl;
+                    // std::cout << "[FrameDrawer] GaussianClusterNum Check: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
+                    // std::cout << "[FrameDrawer] Means3D Check " << pMP->GetGauOpacity() << std::endl;
                     // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
                     // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
                     Means3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
