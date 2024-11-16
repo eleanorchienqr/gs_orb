@@ -326,4 +326,5 @@ void GaussianViewer::ImGUIWindowTest()
     ImGui::End();
 }
 
+
 } //namespace ORB_SLAM

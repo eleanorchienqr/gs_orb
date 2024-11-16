@@ -159,11 +159,6 @@ void LocalMapping::Run()
                     else
                     {
                         Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpCurrentKeyFrame->GetMap(),num_FixedKF_BA,num_OptKF_BA,num_MPs_BA,num_edges_BA);
-                        
-                        #ifdef GAUSSIANSPLATTING
-                        Optimizer::LocalGaussianOptimization(mpCurrentKeyFrame, mpCurrentKeyFrame->GetMap());
-                        #endif
-                        
                         b_doneLBA = true;
                     }
 
@@ -269,6 +264,82 @@ void LocalMapping::Run()
 #endif
         }
         else if(Stop() && !mbBadImu)
+        {
+            // Safe area to stop
+            while(isStopped() && !CheckFinish())
+            {
+                usleep(3000);
+            }
+            if(CheckFinish())
+                break;
+        }
+
+        ResetIfRequested();
+
+        // Tracking will see that Local Mapping is busy
+        SetAcceptKeyFrames(true);
+
+        if(CheckFinish())
+            break;
+
+        usleep(3000);
+    }
+
+    SetFinish();
+}
+
+void LocalMapping::RunWithGS()
+{
+    mbFinished = false;
+
+    while(1)
+    {
+        // Tracking will see that Local Mapping is busy
+        SetAcceptKeyFrames(false);
+
+        // Check if there are keyframes in the queue
+        if(CheckNewKeyFrames())
+        {
+            // BoW conversion and insertion in Map
+            ProcessNewKeyFrame();
+
+            // Check recent MapPoints
+            MapPointCulling();
+        
+            // Triangulate new MapPoints
+            CreateNewMapPoints();
+
+            mbAbortBA = false;
+
+            if(!CheckNewKeyFrames())
+            {
+                // Find more matches in neighbor keyframes and fuse point duplications
+                SearchInNeighbors();
+            }
+
+            bool b_doneLBA = false;
+            int num_FixedKF_BA = 0;
+            int num_OptKF_BA = 0;
+            int num_MPs_BA = 0;
+            int num_edges_BA = 0;
+
+            if(!CheckNewKeyFrames() && !stopRequested())
+            {
+                if(mpAtlas->KeyFramesInMap()>2)
+                {
+
+                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpCurrentKeyFrame->GetMap(),num_FixedKF_BA,num_OptKF_BA,num_MPs_BA,num_edges_BA);
+                    Optimizer::LocalGaussianOptimization(mpCurrentKeyFrame, mpCurrentKeyFrame->GetMap());
+                    
+                    b_doneLBA = true;
+                }
+
+                // Check redundant local Keyframes
+                KeyFrameCulling();
+            }
+            mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+        }
+        else if(Stop())
         {
             // Safe area to stop
             while(isStopped() && !CheckFinish())

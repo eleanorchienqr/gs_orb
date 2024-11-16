@@ -54,6 +54,7 @@ public:
 
     // Main function
     void Run();
+    void RunWithGS(); // Mono version with GS
 
     void InsertKeyFrame(KeyFrame* pKF);
     void EmptyQueue();

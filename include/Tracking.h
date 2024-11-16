@@ -207,6 +207,7 @@ protected:
     //Gaussian associated
     void TrackWithGS();
     bool TrackLocalMapGS();
+    bool NeedNewKeyFrameGS();
 
     // Map initialization for stereo and RGB-D
     void StereoInitialization();
