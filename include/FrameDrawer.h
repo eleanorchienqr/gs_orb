@@ -53,16 +53,20 @@ public:
     cv::Mat DrawRightFrame(float imageScale=1.f);
     cv::Mat DrawGaussianFrame();
 
-    torch::Tensor GetFrameProjMatrix(const float TanFovx, const float TanFovy, const float Near, const float Far);
-    torch::Tensor GetViewMatrix(Sophus::SE3<float> &Tcw);
-    cv::Mat TensorToCVMat(torch::Tensor tensor);
-    cv::Mat CombindImages(const cv::Mat Img1, const cv::Mat Img2);
-
     bool both;
 
 protected:
 
     void DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText);
+
+    // Gaussian associated
+    void GetGaussianRenderData(int &GauSHDegree, torch::Tensor &Means3D, torch::Tensor &Opacity, torch::Tensor &Scales, torch::Tensor &Rotation, torch::Tensor &FeaturesDC, torch::Tensor &FeaturesRest);
+    void GetCamParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy, torch::Tensor &ViewMatrix, torch::Tensor &ProjMatrix, torch::Tensor &CamCenter);
+
+    torch::Tensor GetFrameProjMatrix(const float TanFovx, const float TanFovy, const float Near, const float Far);
+    torch::Tensor GetViewMatrix(Sophus::SE3<float> &Tcw);
+    cv::Mat TensorToCVMat(torch::Tensor tensor);
+    cv::Mat CombindImages(const cv::Mat Img1, const cv::Mat Img2);
 
     // Info of the frame to be drawn
     cv::Mat mIm, mImRight;

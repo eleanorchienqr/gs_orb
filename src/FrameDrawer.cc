@@ -332,8 +332,22 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
 {
     cv::Mat im;
     cv::Mat CombinedImg;
-    Frame currentFrame;
-    vector<MapPoint*> vpLocalMap;
+
+    // Gaussian Info
+    int GauSHDegree;
+    torch::Tensor Means3D;
+    torch::Tensor Opacity;
+    torch::Tensor Scales;
+    torch::Tensor Rotation;
+    torch::Tensor FeaturesDC;
+    torch::Tensor FeaturesRest;
+
+    //Camera Info
+    int ImHeight, ImWidth;
+    float TanFovx, TanFovy;
+    torch::Tensor ViewMatrix;
+    torch::Tensor ProjMatrix;
+    torch::Tensor CamCenter;
 
     int state = mState;
 
@@ -341,126 +355,60 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
     {
         unique_lock<mutex> lock(mMutex);
 
-        // Get MapPoint Data
         if(mState==Tracking::OK)
         {
-            currentFrame = mCurrentFrame;
-            vpLocalMap = mvpLocalMap;
+            GetGaussianRenderData(GauSHDegree, Means3D, Opacity, Scales, Rotation, FeaturesDC, FeaturesRest);
+            GetCamParams(ImHeight, ImWidth, TanFovx, TanFovy, ViewMatrix, ProjMatrix, CamCenter);
         }
 
-        // Get Img data
         mImOrigin.copyTo(im);
         CombinedImg = CombindImages(im, im);
+    }
 
-        if(state==Tracking::OK) 
-        {
-            // Get Gaussians 
-            int GauSHDegree = vpLocalMap[0]->GetGauSHDegree();
-            const int FeaturestDim = std::pow(GauSHDegree + 1, 2) - 1;
-            int SizeofGaussians = 0;
-            for(int i = 0; i < vpLocalMap.size(); i++){
-                MapPoint* pMP = vpLocalMap[i];
-                if(pMP)
-                    SizeofGaussians += pMP->GetGaussianNum();
-            }
-            // std::cout << ">>>>>>>[FrameDrawer] The numbers of Gaussian: " << SizeofGaussians << std::endl;
+    //Draw
+    if(state==Tracking::OK) //TRACKING
+    {
+        torch::NoGradGuard no_grad;
 
-            torch::Tensor Means3D = torch::zeros({SizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-            torch::Tensor Opacity = torch::zeros({SizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-            torch::Tensor Scales = torch::zeros({SizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-            torch::Tensor Rotation = torch::zeros({SizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-            torch::Tensor FeaturesDC = torch::zeros({SizeofGaussians, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-            torch::Tensor FeaturesRest = torch::zeros({SizeofGaussians, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+        GaussianRasterizationSettings raster_settings = {
+            .image_height = static_cast<int>(ImHeight),
+            .image_width = static_cast<int>(ImWidth),
+            .tanfovx = TanFovx,
+            .tanfovy = TanFovy,
+            .bg = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA),
+            .scale_modifier = 1.f,
+            .viewmatrix = ViewMatrix,
+            .projmatrix = ProjMatrix,
+            .sh_degree = GauSHDegree,
+            .camera_center = CamCenter,
+            .prefiltered = false};
 
-            torch::NoGradGuard no_grad;
+        torch::Tensor Means2D = torch::zeros_like(Means3D).to(torch::kCUDA);
+        torch::Tensor Cov3DPrecomp = torch::Tensor();
+        torch::Tensor ColorsPrecomp = torch::Tensor();
 
-            int GaussianClusterIndex = 0;
-            for(int i = 0; i < vpLocalMap.size(); i++)
-            {
-                MapPoint* pMP = vpLocalMap[i];
-                if(pMP)
-                {
-                    int GaussianClusterNum = pMP->GetGaussianNum();
-                    if(GaussianClusterNum)
-                    {
-                        // std::cout << "[FrameDrawer] GaussianClusterNum Check: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
-                        // std::cout << "[FrameDrawer] Means3D Check " << pMP->GetGauOpacity() << std::endl;
-                        // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
-                        // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
-                        Means3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
-                        Opacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
-                        Scales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
-                        Rotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
-                        FeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
-                        FeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
-                        GaussianClusterIndex += GaussianClusterNum;
-                    }
-                }
-            }
+        // Render
+        GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+        torch::cuda::synchronize();
+        auto [rendererd_image, radii] = rasterizer.forward(
+            Means3D,
+            Means2D,
+            torch::sigmoid(Opacity).to(torch::kCUDA),
+            torch::cat({FeaturesDC, FeaturesRest}, 1).to(torch::kCUDA),
+            ColorsPrecomp,
+            torch::exp(Scales).to(torch::kCUDA),
+            torch::nn::functional::normalize(Rotation).to(torch::kCUDA),
+            Cov3DPrecomp);
 
-            //Get Current Camera Info
-            int ImHeight, ImWidth;
-            float TanFovx, TanFovy;
-
-            currentFrame.GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
-
-            // std::cout << "[FrameDrawer] mImHeight: " << ImHeight << std::endl;
-            // std::cout << "[FrameDrawer] mImWidth: " << ImWidth << std::endl;
-            // std::cout << "[FrameDrawer] mTanFovx: " << TanFovx << std::endl;
-            // std::cout << "[FrameDrawer] mTanFovy: " << TanFovy << std::endl;
-            torch::Tensor ProjMatrix = GetFrameProjMatrix(TanFovx, TanFovy, 0.01f, 100.0f);
-
-            Sophus::SE3<float> Tcw = currentFrame.GetPose();
-            torch::Tensor ViewMatrix = GetViewMatrix(Tcw);
-            torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(ProjMatrix.unsqueeze(0)).squeeze(0);
-            torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
-
-            // std::cout << "[FrameDrawer] ProjMatrix: "<< ProjMatrix << std::endl;
-            // std::cout << "[FrameDrawer] ViewMatrix: "<< ViewMatrix << std::endl;
-
-            GaussianRasterizationSettings raster_settings = {
-                .image_height = static_cast<int>(ImHeight),
-                .image_width = static_cast<int>(ImWidth),
-                .tanfovx = TanFovx,
-                .tanfovy = TanFovy,
-                .bg = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA),
-                .scale_modifier = 1.f,
-                .viewmatrix = ViewMatrix,
-                .projmatrix = ProjMatrix,
-                .sh_degree = GauSHDegree,
-                .camera_center = CamCenter,
-                .prefiltered = false};
-
-            torch::Tensor Means2D = torch::zeros_like(Means3D).to(torch::kCUDA);
-            torch::Tensor Cov3DPrecomp = torch::Tensor();
-            torch::Tensor ColorsPrecomp = torch::Tensor();
-
-            // Render
-            GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
-            torch::cuda::synchronize();
-            auto [rendererd_image, radii] = rasterizer.forward(
-                Means3D,
-                Means2D,
-                torch::sigmoid(Opacity).to(torch::kCUDA),
-                torch::cat({FeaturesDC, FeaturesRest}, 1).to(torch::kCUDA),
-                ColorsPrecomp,
-                torch::exp(Scales).to(torch::kCUDA),
-                torch::nn::functional::normalize(Rotation).to(torch::kCUDA),
-                Cov3DPrecomp);
-
-            // Post Processing
-            cv::Mat RenderImg = TensorToCVMat(rendererd_image);
-            CombinedImg = CombindImages(im, RenderImg);
-        }
-
+        // Post Processing
+        cv::Mat RenderImg = TensorToCVMat(rendererd_image);
+        CombinedImg = CombindImages(im, RenderImg);
     }
 
     cv::Mat imWithInfo;
     DrawTextInfo(CombinedImg,state, imWithInfo);
     return imWithInfo;
 }
-
-
 
 void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 {
@@ -569,6 +517,73 @@ void FrameDrawer::Update(Tracking *pTracker)
 
     }
     mState=static_cast<int>(pTracker->mLastProcessedState);
+}
+
+void FrameDrawer::GetGaussianRenderData(int &GauSHDegree, torch::Tensor &Means3D, torch::Tensor &Opacity, torch::Tensor &Scales, 
+                                        torch::Tensor &Rotation, torch::Tensor &FeaturesDC, torch::Tensor &FeaturesRest)
+{
+    torch::NoGradGuard no_grad;
+
+    GauSHDegree = mvpLocalMap[0]->GetGauSHDegree();
+
+    const int FeaturestDim = std::pow(GauSHDegree + 1, 2) - 1;
+    int SizeofGaussians = 0;
+    for(int i = 0; i < mvpLocalMap.size(); i++){
+        MapPoint* pMP = mvpLocalMap[i];
+        if(pMP)
+            SizeofGaussians += pMP->GetGaussianNum();
+    }
+    // std::cout << ">>>>>>>[FrameDrawer] The numbers of Gaussian: " << SizeofGaussians << std::endl;
+
+    // Get Gaussians in local Map
+    Means3D = torch::zeros({SizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    Opacity = torch::zeros({SizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    Scales = torch::zeros({SizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    Rotation = torch::zeros({SizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    FeaturesDC = torch::zeros({SizeofGaussians, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    FeaturesRest = torch::zeros({SizeofGaussians, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+
+    int GaussianClusterIndex = 0;
+    for(int i = 0; i < mvpLocalMap.size(); i++)
+    {
+        MapPoint* pMP = mvpLocalMap[i];
+        if(pMP)
+        {
+            int GaussianClusterNum = pMP->GetGaussianNum();
+            if(GaussianClusterNum)
+            {
+                // std::cout << "[FrameDrawer] GaussianClusterNum Check: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
+                // std::cout << "[FrameDrawer] Means3D Check " << pMP->GetGauOpacity() << std::endl;
+                // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: [ " << GaussianClusterIndex << ", " << GaussianClusterIndex + GaussianClusterNum << " ]" << std::endl;
+                // std::cout << "[InitializeOptimization] The numbers of Gaussian Cluster in Map: " << pMP->GetGauWorldPos() << std::endl;
+                Means3D.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+                Opacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
+                Scales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
+                Rotation.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
+                FeaturesDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
+                FeaturesRest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
+                GaussianClusterIndex += GaussianClusterNum;
+            }
+        }
+    }
+}
+
+void FrameDrawer::GetCamParams(int &ImHeight, int &ImWidth, float &TanFovx, float &TanFovy, torch::Tensor &ViewMatrix, torch::Tensor &ProjMatrix, torch::Tensor &CamCenter)
+{
+    mCurrentFrame.GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
+    
+    // std::cout << "[FrameDrawer] mImHeight: " << ImHeight << std::endl;
+    // std::cout << "[FrameDrawer] mImWidth: " << ImWidth << std::endl;
+    // std::cout << "[FrameDrawer] mTanFovx: " << TanFovx << std::endl;
+    // std::cout << "[FrameDrawer] mTanFovy: " << TanFovy << std::endl;
+    ProjMatrix = GetFrameProjMatrix(TanFovx, TanFovy, 0.01f, 100.0f);
+
+    Sophus::SE3<float> Tcw = mCurrentFrame.GetPose();
+    ViewMatrix = GetViewMatrix(Tcw);
+    CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
+
+    // std::cout << "[FrameDrawer] ProjMatrix: "<< ProjMatrix << std::endl;
+    // std::cout << "[FrameDrawer] ViewMatrix: "<< ViewMatrix << std::endl;
 }
 
 torch::Tensor FrameDrawer::GetFrameProjMatrix(const float TanFovx, const float TanFovy, const float Near, const float Far)
