@@ -514,6 +514,36 @@ std::vector<long> GaussianOptimizer::GetGaussianRootIndex()
     return mvpGaussianRootIndex;
 }
 
+torch::Tensor GaussianOptimizer::GetWorldPos()
+{
+    return mMeans3D.clone();
+}
+
+torch::Tensor GaussianOptimizer::GetWorldRot()
+{
+    return mRotation.clone();
+}
+
+torch::Tensor GaussianOptimizer::GetScale()
+{
+    return mScales.clone();
+}
+
+torch::Tensor GaussianOptimizer::GetOpacity()
+{
+    return mOpacity.clone();
+}
+
+torch::Tensor GaussianOptimizer::GetFeaturest()
+{
+    return mFeaturesRest.clone();
+}
+
+torch::Tensor GaussianOptimizer::GetFeatureDC()
+{
+    return mFeaturesDC.clone();
+}
+
 torch::Tensor GaussianOptimizer::GetWorldPos(const torch::Tensor indices)
 {
     torch::Tensor SelectTensor = mMeans3D.index_select(0, indices);

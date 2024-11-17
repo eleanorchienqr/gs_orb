@@ -23,6 +23,7 @@
 #include "FrameDrawer.h"
 #include "MapDrawer.h"
 #include "Tracking.h"
+#include "LocalMapping.h"
 #include "System.h"
 #include "Settings.h"
 
@@ -32,6 +33,7 @@ namespace ORB_SLAM3
 {
 
 class Tracking;
+class LocalMapping;
 class FrameDrawer;
 class MapDrawer;
 class System;
@@ -62,6 +64,7 @@ public:
     void Release();
 
     //void SetTrackingPause();
+    void SetLocalMapper(LocalMapping* pLocalMapper);
 
     bool both;
 private:
@@ -74,6 +77,8 @@ private:
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
     Tracking* mpTracker;
+
+    LocalMapping* mpLocalMapper;
 
     // 1/fps in ms
     double mT;

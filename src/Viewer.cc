@@ -343,6 +343,12 @@ void Viewer::Run()
         cv::imshow("ORB-SLAM3: Current Frame",toShow);
         cv::waitKey(mT);
 
+        while(1)
+        {
+            if(mpLocalMapper->AcceptKeyFrames())
+                break;
+        }
+
         if(menuReset)
         {
             menuShowGraph = true;
@@ -453,5 +459,10 @@ void Viewer::Release()
 {
     mbStopTrack = true;
 }*/
+
+void Viewer::SetLocalMapper(LocalMapping* pLocalMapper)
+{
+    mpLocalMapper = pLocalMapper;
+}
 
 }

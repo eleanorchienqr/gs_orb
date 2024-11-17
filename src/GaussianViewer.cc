@@ -137,7 +137,13 @@ void GaussianViewer::Run()
             glfwPollEvents();
 
             texture.Unbind();
-            usleep(mT);
+            // usleep(mT);
+
+            while(1)
+            {
+                if(mpLocalMapper->AcceptKeyFrames())
+                    break;
+            }
         }
     }
 

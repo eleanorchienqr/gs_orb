@@ -355,10 +355,14 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
     {
         unique_lock<mutex> lock(mMutex);
 
+        
+
         if(mState==Tracking::OK)
         {
+            // std::cout << "[FrameDrawer Fecth Gaussian Data!]" << std::endl;
             GetGaussianRenderData(GauSHDegree, Means3D, Opacity, Scales, Rotation, FeaturesDC, FeaturesRest);
             GetCamParams(ImHeight, ImWidth, TanFovx, TanFovy, ViewMatrix, ProjMatrix, CamCenter);
+            // std::cout << "[FrameDrawer Fecth Gaussian Data Done!]" << std::endl;
         }
 
         mImOrigin.copyTo(im);
@@ -366,6 +370,7 @@ cv::Mat FrameDrawer::DrawGaussianFrame()
     }
 
     //Draw
+    
     if(state==Tracking::OK) //TRACKING
     {
         torch::NoGradGuard no_grad;

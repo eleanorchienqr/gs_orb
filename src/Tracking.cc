@@ -2567,8 +2567,6 @@ void Tracking::TrackWithGS()
         if(mCurrentFrame.isSet())
             mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.GetPose());
 
-
-
         if(bOK || mState==RECENTLY_LOST)
         {
             // Update motion model

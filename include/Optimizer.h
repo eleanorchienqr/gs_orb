@@ -101,7 +101,9 @@ public:
 
     // GaussianCluster Optimization
     void static GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale);
-    void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale);
+    void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, Map *pMap, int nIterations, const bool bInitializeScale,
+                                     std::vector<long> &GaussianRootIndex, std::vector<std::vector<long>> &GaussianIndices, torch::Tensor &GauWorldPos, torch::Tensor &GauOpacity,
+                                     torch::Tensor &GauScales, torch::Tensor &GauWorldRot, torch::Tensor &GauFeatureDC, torch::Tensor &GauFeaturest);
     void static LocalGaussianOptimization(KeyFrame* pKF, Map *pMap);
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;

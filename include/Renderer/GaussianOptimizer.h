@@ -82,6 +82,13 @@ public:
     torch::Tensor GetFeaturest(const torch::Tensor indices);
     torch::Tensor GetFeatureDC(const torch::Tensor indices);
 
+    torch::Tensor GetWorldPos();
+    torch::Tensor GetWorldRot();
+    torch::Tensor GetScale();
+    torch::Tensor GetOpacity();
+    torch::Tensor GetFeaturest();
+    torch::Tensor GetFeatureDC();
+
     // Converter
     torch::Tensor CVMatToTensor(cv::Mat mat);
     cv::Mat TensorToCVMat(torch::Tensor tensor);

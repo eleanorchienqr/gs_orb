@@ -248,6 +248,9 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mptGaussianViewer = new thread(&ORB_SLAM3::GaussianViewer::Run,mpGaussianViewer);
 
         mpTracker->SetGaussianViewer(mpGaussianViewer);
+        mpGaussianViewer->SetLocalMapper(mpLocalMapper);
+
+        mpViewer->SetLocalMapper(mpLocalMapper);
         #endif
     }
 

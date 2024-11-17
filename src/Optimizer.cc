@@ -5593,30 +5593,23 @@ void Optimizer::GlobalGaussianOptimization(Map* pMap, int nIterations, const boo
 {
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
-    GaussianOptimization(vpKFs,vpMP,nIterations, bInitializeScale);
-}
 
-void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, int nIterations, const bool bInitializeScale)
-{
-    ORB_SLAM3::OptimizationParameters OptimParams;
-    GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
-    optimizer.InitializeOptimization(vpKFs, vpMP, bInitializeScale);
-    optimizer.Optimize();
-
-    // Recover optimized data
-    std::vector<long> vpGaussianRootIndex = optimizer.GetGaussianRootIndex();
+    std::vector<long> vpGaussianRootIndex;
     std::vector<std::vector<long>> vpGaussianIndices(vpMP.size(), std::vector<long>(0));
 
-    for(int i = 0; i < vpGaussianRootIndex.size(); i++)
-    {
-        for(int j = 0; j < vpMP.size(); j++)
-        {
-            if(vpGaussianRootIndex[i] == j)
-                vpGaussianIndices[j].push_back(i); 
-        }
-    }
+    // Gaussian Info
+    torch::Tensor GauWorldPos;
+    torch::Tensor GauOpacity;
+    torch::Tensor GauScales;
+    torch::Tensor GauWorldRot;
+    torch::Tensor GauFeatureDC;
+    torch::Tensor GauFeaturest;
 
-    // std::cout << "[AfterOptimization::vpGaussianNum] " << vpGaussianNum << std::endl;
+    GaussianOptimization(vpKFs,vpMP,pMap,nIterations, bInitializeScale, vpGaussianRootIndex, vpGaussianIndices, 
+                         GauWorldPos, GauOpacity, GauScales, GauWorldRot, GauFeatureDC, GauFeaturest);
+    
+    std::cout << "[GlobalGaussianOptimization Recover Data Begin]" << std::endl;
+
     for(int i = 0; i < vpMP.size(); i++)
     {
         std::vector<long> vpGaussianIndex = vpGaussianIndices[i];
@@ -5631,14 +5624,14 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
                 pMP->ResetGauAttributes(GauNum);
                 torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
                 // std::cout << "[AfterOptimization::MapPoint Index] " << i << " , GaussianIndex: " << vpGaussianIndexTensor << std::endl;
-                torch::Tensor GauWorldPos = optimizer.GetWorldPos(vpGaussianIndexTensor); 
-                torch::Tensor GauWorldRot = optimizer.GetWorldRot(vpGaussianIndexTensor); 
-                torch::Tensor GauScale = optimizer.GetScale(vpGaussianIndexTensor); 
-                torch::Tensor GauOpacity = optimizer.GetOpacity(vpGaussianIndexTensor); 
-                torch::Tensor GauFeaturest = optimizer.GetFeaturest(vpGaussianIndexTensor); 
-                torch::Tensor GauFeatureDC = optimizer.GetFeatureDC(vpGaussianIndexTensor); 
+                torch::Tensor vpGauWorldPos = GauWorldPos.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauWorldRot = GauWorldRot.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauScale = GauScales.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauOpacity = GauOpacity.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauFeaturest = GauFeaturest.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauFeatureDC = GauFeatureDC.index_select(0, vpGaussianIndexTensor); 
                 // std::cout << "[AfterOptimization:GauFeatureDC] " << GauFeatureDC << std::endl;
-                pMP->SetGauAttributes(GauWorldPos, GauWorldRot, GauScale, GauOpacity, GauFeaturest, GauFeatureDC);
+                pMP->SetGauAttributes(vpGauWorldPos, vpGauWorldRot, vpGauScale, vpGauOpacity, vpGauFeaturest, vpGauFeatureDC);
             }
             else
             {
@@ -5646,6 +5639,82 @@ void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vect
             }
         }
     }
+
+    std::cout << "[GlobalGaussianOptimization Done !]" << std::endl;
+}
+
+void Optimizer::GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, Map *pMap, int nIterations, const bool bInitializeScale, 
+                                     std::vector<long> &GaussianRootIndex, std::vector<std::vector<long>> &GaussianIndices, torch::Tensor &GauWorldPos, torch::Tensor &GauOpacity,
+                                     torch::Tensor &GauScales, torch::Tensor &GauWorldRot, torch::Tensor &GauFeatureDC, torch::Tensor &GauFeaturest)
+{
+    ORB_SLAM3::OptimizationParameters OptimParams;
+    GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
+    optimizer.InitializeOptimization(vpKFs, vpMP, bInitializeScale);
+    optimizer.Optimize();
+
+    // Recover optimized data
+    // std::vector<long> vpGaussianRootIndex = optimizer.GetGaussianRootIndex();
+    // std::vector<std::vector<long>> vpGaussianIndices(vpMP.size(), std::vector<long>(0));
+
+    GaussianRootIndex = optimizer.GetGaussianRootIndex();
+
+    for(int i = 0; i < GaussianRootIndex.size(); i++)
+    {
+        for(int j = 0; j < vpMP.size(); j++)
+        {
+            if(GaussianRootIndex[i] == j)
+                GaussianIndices[j].push_back(i); 
+        }
+    }
+
+    GauWorldPos = optimizer.GetWorldPos(); 
+    GauOpacity = optimizer.GetOpacity(); 
+    GauScales = optimizer.GetScale(); 
+    GauWorldRot = optimizer.GetWorldRot(); 
+    GauFeatureDC = optimizer.GetFeatureDC(); 
+    GauFeaturest = optimizer.GetFeaturest(); 
+    
+
+    // // Get Map Mutex
+    // std::cout << "[Gaussian Optimization Recover Data Begin ]" << std::endl;
+    // unique_lock<mutex> lock(pMap->mMutexMapUpdate);
+    // std::cout << "[Gaussian Optimization Recover Data After MapLock ]" << std::endl;
+
+    // for(int i = 0; i < vpMP.size(); i++)
+    // {
+    //     std::vector<long> vpGaussianIndex = vpGaussianIndices[i];
+    //     const long GauNum = vpGaussianIndex.size();
+
+    //     MapPoint* pMP = vpMP[i];
+
+    //     std::cout << "[Gaussian Optimization Recover Data ! ]" << i << std::endl;
+
+    //     if(pMP)
+    //     {
+    //         if(GauNum)
+    //         {
+    //             pMP->ResetGauAttributes(GauNum);
+    //             torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
+    //             // std::cout << "[AfterOptimization::MapPoint Index] " << i << " , GaussianIndex: " << vpGaussianIndexTensor << std::endl;
+    //             torch::Tensor GauWorldPos = optimizer.GetWorldPos(vpGaussianIndexTensor); 
+    //             torch::Tensor GauWorldRot = optimizer.GetWorldRot(vpGaussianIndexTensor); 
+    //             torch::Tensor GauScale = optimizer.GetScale(vpGaussianIndexTensor); 
+    //             torch::Tensor GauOpacity = optimizer.GetOpacity(vpGaussianIndexTensor); 
+    //             torch::Tensor GauFeaturest = optimizer.GetFeaturest(vpGaussianIndexTensor); 
+    //             torch::Tensor GauFeatureDC = optimizer.GetFeatureDC(vpGaussianIndexTensor); 
+    //             // std::cout << "[AfterOptimization:GauFeatureDC] " << GauFeatureDC << std::endl;
+    //             pMP->SetGauAttributes(GauWorldPos, GauWorldRot, GauScale, GauOpacity, GauFeaturest, GauFeatureDC);
+    //         }
+    //         else
+    //         {
+    //             pMP->InitializeGaussianCluster(pMP->GetWorldPos());
+    //         }
+    //     }
+    // }
+
+    // std::cout << "[Gaussian Optimization Done ! ]" << std::endl;
+
+    // pMap->IncreaseChangeIndex();
 }
 
 void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
@@ -5668,7 +5737,7 @@ void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
     for(int i = 0; i < lLocalKeyFrames.size(); i++)
     {
         KeyFrame* pKFi = lLocalKeyFrames[i];
-        vector<MapPoint*> vpMPs = pKFi->GetMapPointMatches();
+        std::vector<MapPoint*> vpMPs = pKFi->GetMapPointMatches();
         for(vector<MapPoint*>::iterator vit=vpMPs.begin(), vend=vpMPs.end(); vit!=vend; vit++)
         {
             MapPoint* pMP = *vit;
@@ -5680,7 +5749,60 @@ void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
         }
     }
 
-    GaussianOptimization(lLocalKeyFrames, lLocalMapPoints, 200, false);
+    std::vector<long> vpGaussianRootIndex;
+    std::vector<std::vector<long>> vpGaussianIndices(lLocalMapPoints.size(), std::vector<long>(0));
+
+    // Gaussian Info
+    torch::Tensor GauWorldPos;
+    torch::Tensor GauOpacity;
+    torch::Tensor GauScales;
+    torch::Tensor GauWorldRot;
+    torch::Tensor GauFeatureDC;
+    torch::Tensor GauFeaturest;
+
+    int nIterations = 200;
+    bool bInitializeScale = false;
+
+    GaussianOptimization(lLocalKeyFrames, lLocalMapPoints, pMap, nIterations, bInitializeScale, vpGaussianRootIndex, vpGaussianIndices,
+                         GauWorldPos, GauOpacity, GauScales, GauWorldRot, GauFeatureDC, GauFeaturest);
+
+    // Get Map Mutex & Recover optimized data
+    std::cout << "[LocalGaussianOptimization Recover Data Begin]" << std::endl;
+    // std::unique_lock<mutex> lock(pMap->mMutexMapUpdate);
+    std::cout << "[LocalGaussianOptimization Recover Data After MapLock]" << std::endl;
+    for(int i = 0; i < lLocalMapPoints.size(); i++)
+    {
+        std::vector<long> vpGaussianIndex = vpGaussianIndices[i];
+        const long GauNum = vpGaussianIndex.size();
+
+        MapPoint* pMP = lLocalMapPoints[i];
+
+        if(pMP)
+        {
+            if(GauNum)
+            {
+                pMP->ResetGauAttributes(GauNum);
+                torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
+                // std::cout << "[AfterOptimization::MapPoint Index] " << i << " , GaussianIndex: " << vpGaussianIndexTensor << std::endl;
+                torch::Tensor vpGauWorldPos = GauWorldPos.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauWorldRot = GauWorldRot.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauScale = GauScales.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauOpacity = GauOpacity.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauFeaturest = GauFeaturest.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauFeatureDC = GauFeatureDC.index_select(0, vpGaussianIndexTensor); 
+                // std::cout << "[AfterOptimization:GauFeatureDC] " << GauFeatureDC << std::endl;
+                pMP->SetGauAttributes(vpGauWorldPos, vpGauWorldRot, vpGauScale, vpGauOpacity, vpGauFeaturest, vpGauFeatureDC);
+            }
+            else
+            {
+                pMP->InitializeGaussianCluster(pMP->GetWorldPos());
+            }
+        }
+    }
+
+    std::cout << "[LocalGaussianOptimization Done ! ]" << std::endl;
+
+    // pMap->IncreaseChangeIndex();
 }
 
 } //namespace ORB_SLAM
