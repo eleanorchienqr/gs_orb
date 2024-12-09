@@ -5805,4 +5805,15 @@ void Optimizer::LocalGaussianOptimization(KeyFrame* pKF, Map *pMap)
     // pMap->IncreaseChangeIndex();
 }
 
+void Optimizer::GlobalGaussianOptimizationMonoGS(KeyFrame* pKF)
+{
+    // std::cout << "[GlobalGaussianOptimizationMonoGS Test]" << std::endl;
+
+    ORB_SLAM3::OptimizationParameters OptimParams;
+    GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
+    optimizer.InitializeOptimization(pKF);
+    // optimizer.OptimizeMonoGS();
+
+}
+
 } //namespace ORB_SLAM

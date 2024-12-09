@@ -2010,7 +2010,7 @@ void Tracking::Track()
 
                 if((!mbVelocity && !pCurrentMap->isImuInitialized()) || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                 {
-                    // std::cout << ">>>>>>>>>>>>MapPoint Operation Test<<<<<<<<<<<<<" << std::endl;
+                    // std::cout << ">>>>>>>>>>>TrackReferenceKeyFrame Test<<<<<<<<<<<<" << std::endl;
                     Verbose::PrintMess("TRACK: Track with respect to the reference KF ", Verbose::VERBOSITY_DEBUG);
                     bOK = TrackReferenceKeyFrame();
                 }
@@ -2362,9 +2362,6 @@ void Tracking::Track()
         mLastFrame = Frame(mCurrentFrame);
     }
 
-
-
-
     if(mState==OK || mState==RECENTLY_LOST)
     {
         // Store frame pose information to retrieve the complete camera trajectory afterwards.
@@ -2465,6 +2462,7 @@ void Tracking::TrackWithGS()
 
             if((!mbVelocity && !pCurrentMap->isImuInitialized()) || mCurrentFrame.mnId<mnLastRelocFrameId+2)
             {
+                // std::cout << ">>>>>>>>>>>TrackReferenceKeyFrame Test<<<<<<<<<<<<" << std::endl;
                 Verbose::PrintMess("TRACK: Track with respect to the reference KF ", Verbose::VERBOSITY_DEBUG);
                 bOK = TrackReferenceKeyFrame();
             }
@@ -2922,6 +2920,7 @@ void Tracking::CreateInitialMapMonocular()
 
     #ifdef GAUSSIANSPLATTING
     Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
+    Optimizer::GlobalGaussianOptimizationMonoGS(pKFcur);
     #endif
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
@@ -3218,7 +3217,6 @@ bool Tracking::TrackWithMotionModel()
     {
         mCurrentFrame.SetPose(mVelocity * mLastFrame.GetPose());
     }
-
 
 
 

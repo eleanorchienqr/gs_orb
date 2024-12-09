@@ -59,6 +59,12 @@ public:
     void TrainingSetup();
     void Optimize();
 
+    // MonoGS Test
+    void InitializeOptimization(ORB_SLAM3::KeyFrame* pKF);
+    void InitializeGaussianFromRGBD(float cx, float cy, float fx, float fy);
+    void TrainingSetupMonoGS();
+    void OptimizeMonoGS();
+
     // Camera params
     std::pair<torch::Tensor, float> GetNerfppNorm();
     std::pair<torch::Tensor, float> GetCenterAndDiag();
@@ -148,6 +154,14 @@ protected:
     std::vector<torch::Tensor> mViewMatrices;
     std::vector<torch::Tensor> mProjMatrices;
     std::vector<torch::Tensor> mCameraCenters;
+
+    // Single Camera/KeyFrame associated members
+    cv::Mat mTrainedImage;
+    torch::Tensor mTrainedImageTensor;
+    torch::Tensor mInitalDepthTensor;
+    torch::Tensor mViewMatrix;
+    torch::Tensor mFullProjMatrix;
+    torch::Tensor mCameraCenter;
 
     int mImHeight;
     int mImWidth;

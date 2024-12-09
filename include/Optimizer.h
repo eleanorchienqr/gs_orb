@@ -106,6 +106,9 @@ public:
                                      torch::Tensor &GauScales, torch::Tensor &GauWorldRot, torch::Tensor &GauFeatureDC, torch::Tensor &GauFeaturest);
     void static LocalGaussianOptimization(KeyFrame* pKF, Map *pMap);
 
+    // Gaussian Optimization Fine Tune
+    void static GlobalGaussianOptimizationMonoGS(KeyFrame* pKF);
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
 protected:
