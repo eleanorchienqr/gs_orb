@@ -1,6 +1,8 @@
 #include "GaussianOptimizer.h"
 #include "Renderer/Rasterizer.h"
 
+#include "Converter.h"
+
 #include <algorithm>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <memory>
@@ -164,15 +166,17 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mImWidth: " << mImWidth << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mTanFovx: " << mTanFovx << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mTanFovy: " << mTanFovy << std::endl;
+    std::cout << "[GaussianSplatting::OptimizeMonoGS] mProjMatrix: " << mProjMatrix << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mViewMatrix: " << mViewMatrix << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mFullProjMatrix: " << mFullProjMatrix << std::endl;
 
     // RGB and Depth Initialization
     mTrainedImage = pKF->mImRGB;
-    mTrainedImageTensor = CVMatToTensor(mTrainedImage);
+    mTrainedImageTensor = CVMatToTensor(mTrainedImage); // [3, height, width]
     mInitalDepthTensor = 2 * torch::ones({1, mTrainedImageTensor.size(1), mTrainedImageTensor.size(2)}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mInitalDepthTensor += torch::randn({1,mInitalDepthTensor.size(1), mInitalDepthTensor.size(2)}).to(torch::kCUDA) * 0.3;
 
+    // std::cout << "[GaussianSplatting::OptimizeMonoGS] mInitalDepthTensor: " << mInitalDepthTensor << std::endl;
     // Single Frame Gaussian Initialization
     InitializeGaussianFromRGBD(pKF->cx, pKF->cy, pKF->fx, pKF->fy);
 
@@ -185,21 +189,65 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
 {
     const int FeaturestDim = std::pow(mSHDegree + 1, 2) - 1;
     mSizeofGaussians = mImHeight * mImWidth;
-    std::cout << "[GaussianSplatting::OptimizeMonoGS] InitializeGaussianFromRGBD: " << mSizeofGaussians << std::endl;
+    // std::cout << "[GaussianSplatting::OptimizeMonoGS] InitializeGaussianFromRGBD: " << mSizeofGaussians << std::endl;
 
     mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mOpacity = torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mOpacity = ORB_SLAM3::Converter::InverseSigmoid(0.5 * torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat))).to(torch::kCUDA);
     mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mFeaturesDC = torch::zeros({mSizeofGaussians, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mFeaturesRest = torch::zeros({mSizeofGaussians, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    
+
+    std::cout << "[GaussianSplatting::OptimizeMonoGS] cx, cy, fx, fy, height, width: " << cx << ", "
+                                                                                        << cy << ", "
+                                                                                        << fx << ", "
+                                                                                        << fy << ", "
+                                                                                        << mImHeight << ", "
+                                                                                        << mImWidth << ", "
+                                                                                        << std::endl;
+
     {
         torch::NoGradGuard no_grad;
-        for(int i = 0; i < mSizeofGaussians; i++)
+        
+        int GaussianIndex = 0;
+        // Need CUDA version
+        for(int i = 0; i < mImWidth; i++)
         {
+            for(int j = 0; j < mImHeight; j++)
+            {
+                
+                // Get Gaussian Pos through pixels and intrinsics
+                torch::Tensor depth = mInitalDepthTensor[0][j][i];
+                torch::Tensor CameraCoord = torch::ones({3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+                
+                CameraCoord[0] = depth * (i-cx)/fx;
+                CameraCoord[1] = depth * (j-cy)/fy;
+                CameraCoord[2] = depth;
+
+                torch::Tensor Point3D = torch::ones({1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+                Point3D[0][0] = mViewMatrix[0][0]*CameraCoord[0] + mViewMatrix[0][1]*CameraCoord[1] + mViewMatrix[0][2]*CameraCoord[2] + mViewMatrix[3][0];
+                Point3D[0][1] = mViewMatrix[1][0]*CameraCoord[0] + mViewMatrix[1][1]*CameraCoord[1] + mViewMatrix[1][2]*CameraCoord[2] + mViewMatrix[3][1];
+                Point3D[0][2] = mViewMatrix[2][0]*CameraCoord[0] + mViewMatrix[2][1]*CameraCoord[1] + mViewMatrix[2][2]*CameraCoord[2] + mViewMatrix[3][2];
+                
+                mMeans3D.index_put_({GaussianIndex, torch::indexing::Slice()},  Point3D);
+
+                // Get Gaussian colors
+                torch::Tensor GauColor = torch::ones({1, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+                GauColor[0][0][0] = mTrainedImageTensor[0][j][i];
+                GauColor[0][0][1] = mTrainedImageTensor[1][j][i];
+                GauColor[0][0][2] = mTrainedImageTensor[2][j][i];
+                torch::Tensor GauColorSH = ORB_SLAM3::Converter::RGB2SH(GauColor).to(torch::kCUDA);
+
+                mFeaturesDC.index_put_({GaussianIndex, torch::indexing::Slice(), torch::indexing::Slice()}, GauColorSH);
+
+                GaussianIndex += 1;
+            }
 
         }
+
+        std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D  << std::endl;
+        std::cout << "[GaussianSplatting::OptimizeMonoGS] mFeaturesDC: " << mFeaturesDC  << std::endl;
+
     }
 
 }
