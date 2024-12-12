@@ -210,7 +210,7 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
         torch::NoGradGuard no_grad;
         
         int GaussianIndex = 0;
-        // Need CUDA version
+        // Need CUDA version for mMeans3D and mFeaturesDC
         for(int i = 0; i < mImWidth; i++)
         {
             for(int j = 0; j < mImHeight; j++)
@@ -245,8 +245,13 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
 
         }
 
-        std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D  << std::endl;
-        std::cout << "[GaussianSplatting::OptimizeMonoGS] mFeaturesDC: " << mFeaturesDC  << std::endl;
+        // Scale initialization
+        torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
+        mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
+
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D  << std::endl;
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mFeaturesDC: " << mFeaturesDC  << std::endl;
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mScales: " << mScales  << std::endl;
 
     }
 
