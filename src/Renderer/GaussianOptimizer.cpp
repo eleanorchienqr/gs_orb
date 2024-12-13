@@ -40,6 +40,12 @@ GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &Op
 
 }
 
+GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams):
+    mMonoGSOptimParams(OptimParams)
+{
+
+}
+
 void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale)
 {
 
@@ -156,10 +162,10 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     pKF->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
     Sophus::SE3f Tcw = pKF->GetPose();
 
-    mProjMatrix = SetProjMatrix();
-    mViewMatrix = GetViewMatrix(Tcw);
-    mFullProjMatrix = mViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0);
-    mCameraCenter = mViewMatrix.inverse()[3].slice(0, 0, 3);
+    mProjMatrix = SetProjMatrix().to(torch::kCUDA);
+    mViewMatrix = GetViewMatrix(Tcw).to(torch::kCUDA);
+    mFullProjMatrix = mViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0).to(torch::kCUDA);
+    mCameraCenter = mViewMatrix.inverse()[3].slice(0, 0, 3).to(torch::kCUDA);
 
     std::cout << "[GaussianSplatting::OptimizeMonoGS] KeyFrame ID: " << pKF->mnId << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mImHeight: " << mImHeight << std::endl;
@@ -172,7 +178,7 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
 
     // RGB and Depth Initialization
     mTrainedImage = pKF->mImRGB;
-    mTrainedImageTensor = CVMatToTensor(mTrainedImage); // [3, height, width]
+    mTrainedImageTensor = CVMatToTensor(mTrainedImage).to(torch::kCUDA); // [3, height, width]
     mInitalDepthTensor = 2 * torch::ones({1, mTrainedImageTensor.size(1), mTrainedImageTensor.size(2)}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mInitalDepthTensor += torch::randn({1,mInitalDepthTensor.size(1), mInitalDepthTensor.size(2)}).to(torch::kCUDA) * 0.3;
 
@@ -181,6 +187,7 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     InitializeGaussianFromRGBD(pKF->cx, pKF->cy, pKF->fx, pKF->fy);
 
     // Setup Optimizer
+    TrainingSetupMonoGS();
 
     // Setup Loss Monitor
 }
@@ -351,7 +358,76 @@ void GaussianOptimizer::Optimize()
 
 void GaussianOptimizer::OptimizeMonoGS()
 {
+    std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
+    for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
+        
+        // Set up rasterization configuration
+        GaussianRasterizationSettings raster_settings = {
+            .image_height = static_cast<int>(mImHeight),
+            .image_width = static_cast<int>(mImWidth),
+            .tanfovx = mTanFovx,
+            .tanfovy = mTanFovy,
+            .bg = mBackground,
+            .scale_modifier = mScaleModifier,
+            .viewmatrix = mViewMatrix,
+            .projmatrix = mFullProjMatrix,
+            .sh_degree = mSHDegree,
+            .camera_center = mCameraCenter,
+            .prefiltered = mPrefiltered};
 
+        // Tensors setup
+        torch::Tensor Means2D = torch::zeros_like(mMeans3D).to(torch::kCUDA).requires_grad_(true);
+        Means2D.retain_grad();
+        torch::Tensor Cov3DPrecomp = torch::Tensor();
+        torch::Tensor ColorsPrecomp = torch::Tensor();
+
+        // Render
+        GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+        torch::cuda::synchronize();
+        auto [rendererd_image, radii] = rasterizer.forward(
+            mMeans3D,
+            Means2D,
+            torch::sigmoid(mOpacity).to(torch::kCUDA),
+            torch::cat({mFeaturesDC, mFeaturesRest}, 1).to(torch::kCUDA),
+            ColorsPrecomp,
+            torch::exp(mScales).to(torch::kCUDA),
+            torch::nn::functional::normalize(mRotation).to(torch::kCUDA),
+            Cov3DPrecomp);
+
+        // Loss Computations
+        auto loss =L1Loss(mTrainedImageTensor, rendererd_image);
+        loss.backward(); 
+
+        // Densify, prune and reset opacity
+        { 
+            torch::NoGradGuard no_grad;
+            // Densification
+            if (iter < mOptimParams.densify_until_iter) {
+                torch::Tensor VisibilityFilter = radii > 0;
+                AddDensificationStats(Means2D, VisibilityFilter);
+                if (iter > mOptimParams.densify_from_iter && iter % mOptimParams.densification_interval == 0) {
+                    float size_threshold = iter > mOptimParams.opacity_reset_interval ? 20.f : -1.f;
+                    DensifyAndPrune(mOptimParams.densify_grad_threshold, mOptimParams.min_opacity, size_threshold);
+                }
+
+                if (iter % mOptimParams.opacity_reset_interval == 0 || (mWhiteBackground && iter == mOptimParams.densify_from_iter)) {
+                    ResetOpacity();
+                }
+            }
+
+            //  Optimizer step
+            if (iter < mOptimParams.iterations) {
+                mOptimizer->step();
+                mOptimizer->zero_grad(true);
+                UpdateLR(iter);
+            }
+
+            // Clear cache
+            if (mOptimParams.empty_gpu_cache && iter % 100) {
+                c10::cuda::CUDACachingAllocator::emptyCache();
+            }
+        }
+    }
 }
 
 void GaussianOptimizer::DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size) {
@@ -785,7 +861,45 @@ void GaussianOptimizer::TrainingSetup()
 
 void GaussianOptimizer::TrainingSetupMonoGS()
 {
+    mPercentDense = mMonoGSOptimParams.percent_dense;
+    mPosGradientAccum = torch::zeros({mMeans3D.size(0), 1}).to(torch::kCUDA);
+    mDenom = torch::zeros({mMeans3D.size(0), 1}).to(torch::kCUDA);
+    mPosSchedulerArgs = GaussianSplatting::Expon_lr_func(mMonoGSOptimParams.position_lr_init * mSpatialLRScale,
+                                                         mMonoGSOptimParams.position_lr_final * mSpatialLRScale,
+                                                         mMonoGSOptimParams.position_lr_delay_mult,
+                                                         mMonoGSOptimParams.position_lr_max_steps  );
+    
+    mMeans3D.set_requires_grad(true);
+    mOpacity.set_requires_grad(true);
+    mScales.set_requires_grad(true);
+    mRotation.set_requires_grad(true);
+    mFeaturesDC.set_requires_grad(true);
+    mFeaturesRest.set_requires_grad(true);
 
+    std::vector<torch::optim::OptimizerParamGroup> OptimizerParamsGroups;
+    OptimizerParamsGroups.reserve(6);
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mMeans3D}, std::make_unique<torch::optim::AdamOptions>(mMonoGSOptimParams.position_lr_init * mSpatialLRScale)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mFeaturesDC}, std::make_unique<torch::optim::AdamOptions>(mMonoGSOptimParams.feature_lr)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mFeaturesRest}, std::make_unique<torch::optim::AdamOptions>(mMonoGSOptimParams.feature_lr / 20.)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mScales}, std::make_unique<torch::optim::AdamOptions>(mMonoGSOptimParams.scaling_lr * mSpatialLRScale)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mRotation}, std::make_unique<torch::optim::AdamOptions>(mMonoGSOptimParams.rotation_lr)));
+    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mOpacity}, std::make_unique<torch::optim::AdamOptions>(mMonoGSOptimParams.opacity_lr)));
+
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[0].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[1].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[2].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[3].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[4].options()).eps(1e-15);
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[5].options()).eps(1e-15);
+
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mMeans3D Check " << mMeans3D.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mFeaturesDC Check " << mFeaturesDC.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mFeaturesRest Check " << mFeaturesRest.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mScales Check " << mScales.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mRotation Check " << mRotation.is_leaf() << std::endl;
+    // std::cout << "[GaussianSplatting::Optimize] OptimizerParamsGroups mOpacity Check " << mOpacity.is_leaf() << std::endl;
+
+    mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));  
 }
 
 std::pair<torch::Tensor, float> GaussianOptimizer::GetNerfppNorm() {

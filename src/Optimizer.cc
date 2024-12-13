@@ -5809,10 +5809,10 @@ void Optimizer::GlobalGaussianOptimizationMonoGS(KeyFrame* pKF)
 {
     // std::cout << "[GlobalGaussianOptimizationMonoGS Test]" << std::endl;
 
-    ORB_SLAM3::OptimizationParameters OptimParams;
+    ORB_SLAM3::MonoGSOptimizationParameters OptimParams;
     GaussianSplatting::GaussianOptimizer optimizer(OptimParams);
     optimizer.InitializeOptimization(pKF);
-    // optimizer.OptimizeMonoGS();
+    optimizer.OptimizeMonoGS();
 
 }
 

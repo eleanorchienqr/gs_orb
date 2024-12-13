@@ -54,6 +54,7 @@ class GaussianOptimizer
 public:
     // constructer
     GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &OptimParams);
+    GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams);
 
     void InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale);
     void TrainingSetup();
@@ -132,6 +133,7 @@ public:
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;
+    ORB_SLAM3::MonoGSOptimizationParameters mMonoGSOptimParams;
 
     // Gaussian associated members
     int mSizeofGaussians;
