@@ -52,10 +52,11 @@ private:
 class GaussianOptimizer
 {
 public:
-    // constructer
+    // Constructer
     GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &OptimParams);
     GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams);
 
+    // Optimization body
     void InitializeOptimization(const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP, const bool bInitializeScale);
     void TrainingSetup();
     void Optimize();
@@ -96,6 +97,8 @@ public:
     torch::Tensor GetFeaturest();
     torch::Tensor GetFeatureDC();
 
+    int GetActiveSHDegree();
+
     // Converter
     torch::Tensor CVMatToTensor(cv::Mat mat);
     cv::Mat TensorToCVMat(torch::Tensor tensor);
@@ -122,6 +125,9 @@ public:
     
     // Learning rate updater
     void UpdateLR(float iteration);
+
+    // SH degree updater
+    void UpdateSHDegree();
 
     // Utils
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
@@ -175,6 +181,8 @@ protected:
     bool mWhiteBackground = true;
     float mScaleModifier = 1.f;
     int mSHDegree = 3;
+    int mMaxSHDegree = 3;
+    int mActiveSHDegree = 0;
     bool mPrefiltered = false;
     float mNear = 0.01f;
     float mFar = 100.0f;

@@ -183,8 +183,12 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     mInitalDepthTensor += torch::randn({1,mInitalDepthTensor.size(1), mInitalDepthTensor.size(2)}).to(torch::kCUDA) * 0.3;
 
     // std::cout << "[GaussianSplatting::OptimizeMonoGS] mInitalDepthTensor: " << mInitalDepthTensor << std::endl;
-    // Single Frame Gaussian Initialization
+    // Single Frame Gaussian attribution Initialization
     InitializeGaussianFromRGBD(pKF->cx, pKF->cy, pKF->fx, pKF->fy);
+
+    // Calculate cameras associated members for densification
+    mNerfNormTranslation = -mCameraCenter;
+    mNerfNormRadius = 0.0f;
 
     // Setup Optimizer
     TrainingSetupMonoGS();
@@ -359,6 +363,7 @@ void GaussianOptimizer::Optimize()
 void GaussianOptimizer::OptimizeMonoGS()
 {
     std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;mTrainedImageTensor: " << mTrainedImageTensor << std::endl;
     for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
         
         // Set up rasterization configuration
@@ -371,7 +376,7 @@ void GaussianOptimizer::OptimizeMonoGS()
             .scale_modifier = mScaleModifier,
             .viewmatrix = mViewMatrix,
             .projmatrix = mFullProjMatrix,
-            .sh_degree = mSHDegree,
+            .sh_degree = GetActiveSHDegree(),
             .camera_center = mCameraCenter,
             .prefiltered = mPrefiltered};
 
@@ -422,10 +427,26 @@ void GaussianOptimizer::OptimizeMonoGS()
                 UpdateLR(iter);
             }
 
+            // Update SH degree
+            if (iter % 1000 == 0) {
+                UpdateSHDegree();
+            }
+
             // Clear cache
             if (mOptimParams.empty_gpu_cache && iter % 100) {
                 c10::cuda::CUDACachingAllocator::emptyCache();
             }
+        }
+
+        // Image debug
+        if(iter == mOptimParams.iterations)
+        {
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image << std::endl;
+            cv::Mat RenderImg = TensorToCVMat(rendererd_image);
+            cv::imwrite("MonoGS_InitialImage.png", RenderImg);
+
+            cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
+            cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
         }
     }
 }
@@ -800,12 +821,12 @@ cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
     int64_t height = tensor.size(0);
     int64_t width = tensor.size(1);
     cv::Mat mat = cv::Mat(height, width, CV_8UC3, tensor.data_ptr());
+
     return mat.clone();
 }
 
 torch::Tensor GaussianOptimizer::CVMatToTensor(cv::Mat mat)
 {
-    cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
     cv::Mat matFloat;
     mat.convertTo(matFloat, CV_32F, 1.0 / 255);
     
@@ -967,34 +988,34 @@ torch::Tensor GaussianOptimizer::SetProjMatrix()
     return ProjMatrix.clone();
 }
 
-    /**
-    * @brief Builds a rotation matrix from a tensor of quaternions.
-    *
-    * @param r Tensor of quaternions with shape (N, 4).
-    * @return Tensor of rotation matrices with shape (N, 3, 3).
-    */
-    torch::Tensor GaussianOptimizer::RotQuaToMatrix(torch::Tensor r) {
-        torch::Tensor norm = torch::sqrt(torch::sum(r.pow(2), 1));
-        torch::Tensor q = r / norm.unsqueeze(-1);
+/**
+* @brief Builds a rotation matrix from a tensor of quaternions.
+*
+* @param r Tensor of quaternions with shape (N, 4).
+* @return Tensor of rotation matrices with shape (N, 3, 3).
+*/
+torch::Tensor GaussianOptimizer::RotQuaToMatrix(torch::Tensor r) {
+    torch::Tensor norm = torch::sqrt(torch::sum(r.pow(2), 1));
+    torch::Tensor q = r / norm.unsqueeze(-1);
 
-        using Slice = torch::indexing::Slice;
-        torch::Tensor R = torch::zeros({q.size(0), 3, 3}, torch::device(torch::kCUDA));
-        torch::Tensor r0 = q.index({Slice(), 0});
-        torch::Tensor x = q.index({Slice(), 1});
-        torch::Tensor y = q.index({Slice(), 2});
-        torch::Tensor z = q.index({Slice(), 3});
+    using Slice = torch::indexing::Slice;
+    torch::Tensor R = torch::zeros({q.size(0), 3, 3}, torch::device(torch::kCUDA));
+    torch::Tensor r0 = q.index({Slice(), 0});
+    torch::Tensor x = q.index({Slice(), 1});
+    torch::Tensor y = q.index({Slice(), 2});
+    torch::Tensor z = q.index({Slice(), 3});
 
-        R.index_put_({Slice(), 0, 0}, 1 - 2 * (y * y + z * z));
-        R.index_put_({Slice(), 0, 1}, 2 * (x * y - r0 * z));
-        R.index_put_({Slice(), 0, 2}, 2 * (x * z + r0 * y));
-        R.index_put_({Slice(), 1, 0}, 2 * (x * y + r0 * z));
-        R.index_put_({Slice(), 1, 1}, 1 - 2 * (x * x + z * z));
-        R.index_put_({Slice(), 1, 2}, 2 * (y * z - r0 * x));
-        R.index_put_({Slice(), 2, 0}, 2 * (x * z - r0 * y));
-        R.index_put_({Slice(), 2, 1}, 2 * (y * z + r0 * x));
-        R.index_put_({Slice(), 2, 2}, 1 - 2 * (x * x + y * y));
-        return R;
-    }
+    R.index_put_({Slice(), 0, 0}, 1 - 2 * (y * y + z * z));
+    R.index_put_({Slice(), 0, 1}, 2 * (x * y - r0 * z));
+    R.index_put_({Slice(), 0, 2}, 2 * (x * z + r0 * y));
+    R.index_put_({Slice(), 1, 0}, 2 * (x * y + r0 * z));
+    R.index_put_({Slice(), 1, 1}, 1 - 2 * (x * x + z * z));
+    R.index_put_({Slice(), 1, 2}, 2 * (y * z - r0 * x));
+    R.index_put_({Slice(), 2, 0}, 2 * (x * z - r0 * y));
+    R.index_put_({Slice(), 2, 1}, 2 * (y * z + r0 * x));
+    R.index_put_({Slice(), 2, 2}, 1 - 2 * (x * x + y * y));
+    return R;
+}
 
 torch::Tensor GaussianOptimizer::GaussianKernel1D(int window_size, float sigma) {
         torch::Tensor gauss = torch::empty(window_size);
@@ -1009,6 +1030,18 @@ torch::Tensor GaussianOptimizer::CreateWindow()
     auto _1D_window = GaussianKernel1D(mWindowSize, 1.5).unsqueeze(1);
     auto _2D_window = _1D_window.mm(_1D_window.t()).unsqueeze(0).unsqueeze(0);
     return _2D_window.expand({mChannel, 1, mWindowSize, mWindowSize}).contiguous();
+}
+
+void GaussianOptimizer::UpdateSHDegree()
+{
+    if (mActiveSHDegree < mMaxSHDegree) {
+        mActiveSHDegree++;
+    }
+}
+
+int GaussianOptimizer::GetActiveSHDegree()
+{
+    return mActiveSHDegree;
 }
 
 }
