@@ -201,13 +201,14 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
     const int FeaturestDim = std::pow(mSHDegree + 1, 2) - 1;
     mSizeofGaussians = mImHeight * mImWidth;
     // std::cout << "[GaussianSplatting::OptimizeMonoGS] InitializeGaussianFromRGBD: " << mSizeofGaussians << std::endl;
+    const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
-    mMeans3D = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mOpacity = ORB_SLAM3::Converter::InverseSigmoid(0.5 * torch::zeros({mSizeofGaussians, 1}, torch::dtype(torch::kFloat))).to(torch::kCUDA);
-    mScales = torch::zeros({mSizeofGaussians, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mRotation = torch::zeros({mSizeofGaussians, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mFeaturesDC = torch::zeros({mSizeofGaussians, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
-    mFeaturesRest = torch::zeros({mSizeofGaussians, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mMeans3D = torch::zeros({mSizeofGaussians, 3}, pointType).to(torch::kCUDA);
+    mOpacity = ORB_SLAM3::Converter::InverseSigmoid(0.5 * torch::ones({mSizeofGaussians, 1}, pointType)).to(torch::kCUDA);
+    mScales = torch::zeros({mSizeofGaussians, 3}, pointType).to(torch::kCUDA);
+    mRotation = torch::zeros({mSizeofGaussians, 4}, pointType).to(torch::kCUDA);
+    mFeaturesDC = torch::zeros({mSizeofGaussians, 1, 3}, pointType).to(torch::kCUDA);
+    mFeaturesRest = torch::zeros({mSizeofGaussians, FeaturestDim, 3}, pointType).to(torch::kCUDA);
 
     std::cout << "[GaussianSplatting::OptimizeMonoGS] cx, cy, fx, fy, height, width: " << cx << ", "
                                                                                         << cy << ", "
@@ -221,6 +222,7 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
         torch::NoGradGuard no_grad;
         
         int GaussianIndex = 0;
+
         // Need CUDA version for mMeans3D and mFeaturesDC
         for(int i = 0; i < mImWidth; i++)
         {
@@ -229,13 +231,13 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
                 
                 // Get Gaussian Pos through pixels and intrinsics
                 torch::Tensor depth = mInitalDepthTensor[0][j][i];
-                torch::Tensor CameraCoord = torch::ones({3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+                torch::Tensor CameraCoord = torch::ones({3}, pointType).to(torch::kCUDA);
                 
                 CameraCoord[0] = depth * (i-cx)/fx;
                 CameraCoord[1] = depth * (j-cy)/fy;
                 CameraCoord[2] = depth;
 
-                torch::Tensor Point3D = torch::ones({1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+                torch::Tensor Point3D = torch::ones({1, 3}, pointType).to(torch::kCUDA);
                 Point3D[0][0] = mViewMatrix[0][0]*CameraCoord[0] + mViewMatrix[0][1]*CameraCoord[1] + mViewMatrix[0][2]*CameraCoord[2] + mViewMatrix[3][0];
                 Point3D[0][1] = mViewMatrix[1][0]*CameraCoord[0] + mViewMatrix[1][1]*CameraCoord[1] + mViewMatrix[1][2]*CameraCoord[2] + mViewMatrix[3][1];
                 Point3D[0][2] = mViewMatrix[2][0]*CameraCoord[0] + mViewMatrix[2][1]*CameraCoord[1] + mViewMatrix[2][2]*CameraCoord[2] + mViewMatrix[3][2];
@@ -243,7 +245,7 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
                 mMeans3D.index_put_({GaussianIndex, torch::indexing::Slice()},  Point3D);
 
                 // Get Gaussian colors
-                torch::Tensor GauColor = torch::ones({1, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+                torch::Tensor GauColor = torch::ones({1, 1, 3}, pointType).to(torch::kCUDA);
                 GauColor[0][0][0] = mTrainedImageTensor[0][j][i];
                 GauColor[0][0][1] = mTrainedImageTensor[1][j][i];
                 GauColor[0][0][2] = mTrainedImageTensor[2][j][i];
@@ -260,10 +262,12 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
         torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
         mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
 
+        // Rotation initialization
+        mRotation.index_put_({torch::indexing::Slice(), 0}, 1.f);
+
         // std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D  << std::endl;
         // std::cout << "[GaussianSplatting::OptimizeMonoGS] mFeaturesDC: " << mFeaturesDC  << std::endl;
-        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mScales: " << mScales  << std::endl;
-
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mRotation: " << mRotation  << std::endl;
     }
 
 }
@@ -363,7 +367,16 @@ void GaussianOptimizer::Optimize()
 void GaussianOptimizer::OptimizeMonoGS()
 {
     std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;mTrainedImageTensor: " << mTrainedImageTensor << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;image_height: " << mImHeight << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;image_width: " << mImWidth << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;tanfovx: " << mTanFovx << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;tanfovy: " << mTanFovy << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;bg: " << mBackground << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;viewmatrix: " << mViewMatrix << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;projmatrix: " << mFullProjMatrix << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;sh_degree: " << GetActiveSHDegree() << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;camera_center: " << mCameraCenter << std::endl;
+
     for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
         
         // Set up rasterization configuration
@@ -388,7 +401,9 @@ void GaussianOptimizer::OptimizeMonoGS()
 
         // Render
         GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+
         torch::cuda::synchronize();
+
         auto [rendererd_image, radii] = rasterizer.forward(
             mMeans3D,
             Means2D,
@@ -398,9 +413,23 @@ void GaussianOptimizer::OptimizeMonoGS()
             torch::exp(mScales).to(torch::kCUDA),
             torch::nn::functional::normalize(mRotation).to(torch::kCUDA),
             Cov3DPrecomp);
+        
+        // Image debug
+        // if(iter == mOptimParams.iterations)
+        if(iter == 50)
+        {
+            torch::NoGradGuard no_grad;
+
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image << std::endl;
+            cv::Mat RenderImg = TensorToCVMat(rendererd_image);
+            cv::imwrite("MonoGS_InitialImage.png", RenderImg);
+
+            cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
+            cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
+        }
 
         // Loss Computations
-        auto loss =L1Loss(mTrainedImageTensor, rendererd_image);
+        auto loss = L1Loss(mTrainedImageTensor, rendererd_image);
         loss.backward(); 
 
         // Densify, prune and reset opacity
@@ -436,17 +465,6 @@ void GaussianOptimizer::OptimizeMonoGS()
             if (mOptimParams.empty_gpu_cache && iter % 100) {
                 c10::cuda::CUDACachingAllocator::emptyCache();
             }
-        }
-
-        // Image debug
-        if(iter == mOptimParams.iterations)
-        {
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image << std::endl;
-            cv::Mat RenderImg = TensorToCVMat(rendererd_image);
-            cv::imwrite("MonoGS_InitialImage.png", RenderImg);
-
-            cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
-            cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
         }
     }
 }

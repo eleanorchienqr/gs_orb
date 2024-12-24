@@ -169,7 +169,6 @@ include/Renderer/VertexBufferLayout.h
 include/Renderer/debug_utils.h
 include/Renderer/Rasterizer.h
 include/Renderer/RasterizePoints.h
-include/Renderer/RenderUtils.h
 include/Renderer/GaussianOptimizer.h
 include/Renderer/cuda_rasterizer/auxiliary.h
 include/Renderer/cuda_rasterizer/backward.h
