@@ -74,6 +74,7 @@ public:
     // Getters
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
     torch::Tensor SetProjMatrix();
+    torch::Tensor SetProjMatrixMonoGS();
 
     std::vector<int> GetRandomIndices(const int &max_index);
     torch::Tensor GetViewMatrixWithIndex(const int &CamIndex);
@@ -147,9 +148,9 @@ protected:
     torch::Tensor mOpacity;
     torch::Tensor mScales;
     torch::Tensor mRotation;
-    
     torch::Tensor mFeaturesDC;
     torch::Tensor mFeaturesRest;
+
     // torch::Tensor mMeans2D;                          // reset every iter
     // torch::Tensor mFeatures;                         // reset every iter
     // torch::Tensor mCov3DPrecomp = torch::Tensor();   // reset every iter
@@ -175,6 +176,11 @@ protected:
     int mImWidth;
     float mTanFovx;
     float mTanFovy;
+    float mFx;
+    float mFy;
+    float mCx;
+    float mCy;
+    
     torch::Tensor mProjMatrix;
     
     torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);

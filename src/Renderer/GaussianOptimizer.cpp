@@ -160,9 +160,13 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
 
     // Get Camera Data
     pKF->GetGaussianRenderParams(mImHeight, mImWidth, mTanFovx, mTanFovy);
+    mFx = pKF->fx;
+    mFy = pKF->fy;
+    mCx = pKF->cx;
+    mCy = pKF->cy;
     Sophus::SE3f Tcw = pKF->GetPose();
 
-    mProjMatrix = SetProjMatrix().to(torch::kCUDA);
+    mProjMatrix = SetProjMatrixMonoGS().to(torch::kCUDA);
     mViewMatrix = GetViewMatrix(Tcw).to(torch::kCUDA);
     mFullProjMatrix = mViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0).to(torch::kCUDA);
     mCameraCenter = mViewMatrix.inverse()[3].slice(0, 0, 3).to(torch::kCUDA);
@@ -223,6 +227,8 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
         
         int GaussianIndex = 0;
 
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mInitalDepthTensor: " << mInitalDepthTensor  << std::endl;
+
         // Need CUDA version for mMeans3D and mFeaturesDC
         for(int i = 0; i < mImWidth; i++)
         {
@@ -250,6 +256,13 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
                 GauColor[0][0][1] = mTrainedImageTensor[1][j][i];
                 GauColor[0][0][2] = mTrainedImageTensor[2][j][i];
                 torch::Tensor GauColorSH = ORB_SLAM3::Converter::RGB2SH(GauColor).to(torch::kCUDA);
+
+                // if(float(GauColor[0][0][0]) > 1.f || float(GauColor[0][0][0]) < -1.f || GauColor[0][0][1] > 1.f || GauColor[0][0][1] < -1.f || GauColor[0][0][2] > 1.f || GauColor[0][0][2] < -1.f )
+                // if(float(GauColor[0][0][0].item()) > 1.f)
+                // {
+                //     std::cout << "[GaussianSplatting::OptimizeMonoGS] GauColor: " << GauColor  << std::endl;
+                //     std::cout << "[GaussianSplatting::OptimizeMonoGS] GauColorSH: " << GauColorSH  << std::endl;
+                // }
 
                 mFeaturesDC.index_put_({GaussianIndex, torch::indexing::Slice(), torch::indexing::Slice()}, GauColorSH);
 
@@ -416,16 +429,18 @@ void GaussianOptimizer::OptimizeMonoGS()
         
         // Image debug
         // if(iter == mOptimParams.iterations)
-        if(iter == 50)
+        if(iter == 1000)
         {
             torch::NoGradGuard no_grad;
 
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image << std::endl;
+            std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image[2] - mTrainedImageTensor[2] << std::endl;
             cv::Mat RenderImg = TensorToCVMat(rendererd_image);
             cv::imwrite("MonoGS_InitialImage.png", RenderImg);
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << RenderImg.cols << ", " << RenderImg.rows  << ", " << RenderImg.channels() << std::endl;
 
             cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
             cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;TrianedImg: " << TrianedImg << std::endl;
         }
 
         // Loss Computations
@@ -833,7 +848,8 @@ auto mu1 = torch::nn::functional::conv2d(img1, mSSIMWindow, torch::nn::functiona
 
 cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
 {
-    tensor = tensor.squeeze().detach().permute({1, 2, 0});
+    // tensor = tensor.squeeze().detach().permute({1, 2, 0});
+    tensor = tensor.detach().permute({1, 2, 0});
     tensor = tensor.mul(255).clamp(0, 255).to(torch::kU8);
     tensor = tensor.to(torch::kCPU);
     int64_t height = tensor.size(0);
@@ -988,6 +1004,40 @@ torch::Tensor GaussianOptimizer::SetProjMatrix()
     float bottom = -top;
     float right = mTanFovx * mNear;
     float left = -right;
+
+    Eigen::Matrix4f P = Eigen::Matrix4f::Zero();
+
+    float z_sign = 1.f;
+
+    P(0, 0) = 2.f * mNear / (right - left);
+    P(1, 1) = 2.f * mNear / (top - bottom);
+    P(0, 2) = (right + left) / (right - left);
+    P(1, 2) = (top + bottom) / (top - bottom);
+    P(3, 2) = z_sign;
+    P(2, 2) = z_sign * mFar / (mFar - mNear);
+    P(2, 3) = -(mFar * mNear) / (mFar - mNear);
+
+    // create torch::Tensor from Eigen::Matrix
+    torch::Tensor ProjMatrix = torch::from_blob(P.data(), {4, 4}, torch::kFloat);
+    return ProjMatrix.clone();
+}
+
+torch::Tensor GaussianOptimizer::SetProjMatrixMonoGS()
+{
+    // float top = mTanFovy * mNear;
+    // float bottom = -top;
+    // float right = mTanFovx * mNear;
+    // float left = -right;
+
+    float left_ = ((2 * mCx - mImWidth) / mImWidth - 1.0) * mImWidth / 2.0;
+    float right_ = ((2 * mCx - mImWidth) / mImWidth + 1.0) * mImWidth / 2.0;
+    float top_ = ((2 * mCy - mImHeight) / mImHeight + 1.0) * mImHeight / 2.0;
+    float bottom_ = ((2 * mCy - mImHeight) / mImHeight - 1.0) * mImHeight / 2.0;
+
+    float left = mNear / mFx * left_;
+    float right = mNear / mFx * right_;
+    float top = mNear / mFy * top_;
+    float bottom = mNear / mFy * bottom_;
 
     Eigen::Matrix4f P = Eigen::Matrix4f::Zero();
 
