@@ -164,12 +164,12 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     mFy = pKF->fy;
     mCx = pKF->cx;
     mCy = pKF->cy;
-    Sophus::SE3f Tcw = pKF->GetPose();
+    Sophus::SE3f Tcw = pKF->GetPose(); 
 
-    mProjMatrix = SetProjMatrixMonoGS().to(torch::kCUDA);
-    mViewMatrix = GetViewMatrix(Tcw).to(torch::kCUDA);
-    mFullProjMatrix = mViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0).to(torch::kCUDA);
-    mCameraCenter = mViewMatrix.inverse()[3].slice(0, 0, 3).to(torch::kCUDA);
+    mProjMatrix = SetProjMatrixMonoGS().to(torch::kCUDA);                                                 // camera-to-NDC matrix
+    mViewMatrix = GetViewMatrix(Tcw).to(torch::kCUDA);                                                    // world-to-camera matrix
+    mFullProjMatrix = mViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0).to(torch::kCUDA); // world-to-camera matrix * camera-to-NDC matrix
+    mCameraCenter = mViewMatrix.inverse()[3].slice(0, 0, 3).to(torch::kCUDA);                             
 
     std::cout << "[GaussianSplatting::OptimizeMonoGS] KeyFrame ID: " << pKF->mnId << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mImHeight: " << mImHeight << std::endl;
@@ -178,12 +178,13 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mTanFovy: " << mTanFovy << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mProjMatrix: " << mProjMatrix << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mViewMatrix: " << mViewMatrix << std::endl;
+    std::cout << "[GaussianSplatting::OptimizeMonoGS] View2WorldMatrix: " << mViewMatrix.inverse() << std::endl;
     std::cout << "[GaussianSplatting::OptimizeMonoGS] mFullProjMatrix: " << mFullProjMatrix << std::endl;
 
     // RGB and Depth Initialization
     mTrainedImage = pKF->mImRGB;
     mTrainedImageTensor = CVMatToTensor(mTrainedImage).to(torch::kCUDA); // [3, height, width]
-    mInitalDepthTensor = 2 * torch::ones({1, mTrainedImageTensor.size(1), mTrainedImageTensor.size(2)}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mInitalDepthTensor = 2.f * torch::ones({1, mTrainedImageTensor.size(1), mTrainedImageTensor.size(2)}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
     mInitalDepthTensor += torch::randn({1,mInitalDepthTensor.size(1), mInitalDepthTensor.size(2)}).to(torch::kCUDA) * 0.3;
 
     // std::cout << "[GaussianSplatting::OptimizeMonoGS] mInitalDepthTensor: " << mInitalDepthTensor << std::endl;
@@ -235,7 +236,7 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
             for(int j = 0; j < mImHeight; j++)
             {
                 
-                // Get Gaussian Pos through pixels and intrinsics
+                // Get Gaussian Pos through pixels [image coord to camera coord * camera coord to world coord]
                 torch::Tensor depth = mInitalDepthTensor[0][j][i];
                 torch::Tensor CameraCoord = torch::ones({3}, pointType).to(torch::kCUDA);
                 
@@ -244,10 +245,12 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
                 CameraCoord[2] = depth;
 
                 torch::Tensor Point3D = torch::ones({1, 3}, pointType).to(torch::kCUDA);
-                Point3D[0][0] = mViewMatrix[0][0]*CameraCoord[0] + mViewMatrix[0][1]*CameraCoord[1] + mViewMatrix[0][2]*CameraCoord[2] + mViewMatrix[3][0];
-                Point3D[0][1] = mViewMatrix[1][0]*CameraCoord[0] + mViewMatrix[1][1]*CameraCoord[1] + mViewMatrix[1][2]*CameraCoord[2] + mViewMatrix[3][1];
-                Point3D[0][2] = mViewMatrix[2][0]*CameraCoord[0] + mViewMatrix[2][1]*CameraCoord[1] + mViewMatrix[2][2]*CameraCoord[2] + mViewMatrix[3][2];
+                torch::Tensor View2WorldMatrix = mViewMatrix.inverse();
+                Point3D[0][0] = View2WorldMatrix[0][0]*CameraCoord[0] + View2WorldMatrix[0][1]*CameraCoord[1] + View2WorldMatrix[0][2]*CameraCoord[2] + View2WorldMatrix[3][0];
+                Point3D[0][1] = View2WorldMatrix[1][0]*CameraCoord[0] + View2WorldMatrix[1][1]*CameraCoord[1] + View2WorldMatrix[1][2]*CameraCoord[2] + View2WorldMatrix[3][1];
+                Point3D[0][2] = View2WorldMatrix[2][0]*CameraCoord[0] + View2WorldMatrix[2][1]*CameraCoord[1] + View2WorldMatrix[2][2]*CameraCoord[2] + View2WorldMatrix[3][2];
                 
+
                 mMeans3D.index_put_({GaussianIndex, torch::indexing::Slice()},  Point3D);
 
                 // Get Gaussian colors
@@ -380,15 +383,6 @@ void GaussianOptimizer::Optimize()
 void GaussianOptimizer::OptimizeMonoGS()
 {
     std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;image_height: " << mImHeight << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;image_width: " << mImWidth << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;tanfovx: " << mTanFovx << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;tanfovy: " << mTanFovy << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;bg: " << mBackground << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;viewmatrix: " << mViewMatrix << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;projmatrix: " << mFullProjMatrix << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;sh_degree: " << GetActiveSHDegree() << std::endl;
-    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;camera_center: " << mCameraCenter << std::endl;
 
     for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
         
@@ -433,7 +427,7 @@ void GaussianOptimizer::OptimizeMonoGS()
         {
             torch::NoGradGuard no_grad;
 
-            std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image[2] - mTrainedImageTensor[2] << std::endl;
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image[2] - mTrainedImageTensor[2] << std::endl;
             cv::Mat RenderImg = TensorToCVMat(rendererd_image);
             cv::imwrite("MonoGS_InitialImage.png", RenderImg);
             // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << RenderImg.cols << ", " << RenderImg.rows  << ", " << RenderImg.channels() << std::endl;

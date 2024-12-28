@@ -74,7 +74,6 @@ public:
     // Getters
     torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
     torch::Tensor SetProjMatrix();
-    torch::Tensor SetProjMatrixMonoGS();
 
     std::vector<int> GetRandomIndices(const int &max_index);
     torch::Tensor GetViewMatrixWithIndex(const int &CamIndex);
@@ -99,6 +98,9 @@ public:
     torch::Tensor GetFeatureDC();
 
     int GetActiveSHDegree();
+
+    // MonoGS Getters
+    torch::Tensor SetProjMatrixMonoGS();
 
     // Converter
     torch::Tensor CVMatToTensor(cv::Mat mat);
@@ -164,13 +166,15 @@ protected:
     std::vector<torch::Tensor> mProjMatrices;
     std::vector<torch::Tensor> mCameraCenters;
 
-    // Single Camera/KeyFrame associated members
+
+    // Single Camera/KeyFrame associated members for MonoGS
     cv::Mat mTrainedImage;
     torch::Tensor mTrainedImageTensor;
     torch::Tensor mInitalDepthTensor;
     torch::Tensor mViewMatrix;
     torch::Tensor mFullProjMatrix;
     torch::Tensor mCameraCenter;
+    torch::Tensor mView2WorldMatrix;
 
     int mImHeight;
     int mImWidth;
