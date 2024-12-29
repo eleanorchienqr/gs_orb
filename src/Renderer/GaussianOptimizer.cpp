@@ -427,10 +427,9 @@ void GaussianOptimizer::OptimizeMonoGS()
         {
             torch::NoGradGuard no_grad;
 
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;rendererd_image: " << rendererd_image[2] - mTrainedImageTensor[2] << std::endl;
             cv::Mat RenderImg = TensorToCVMat(rendererd_image);
             cv::imwrite("MonoGS_InitialImage.png", RenderImg);
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << RenderImg.cols << ", " << RenderImg.rows  << ", " << RenderImg.channels() << std::endl;
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image << std::endl;
 
             cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
             cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
@@ -438,7 +437,7 @@ void GaussianOptimizer::OptimizeMonoGS()
         }
 
         // Loss Computations
-        auto loss = L1Loss(mTrainedImageTensor, rendererd_image);
+        auto loss = L1Loss(rendererd_image, mTrainedImageTensor);
         loss.backward(); 
 
         // Densify, prune and reset opacity
@@ -842,13 +841,13 @@ auto mu1 = torch::nn::functional::conv2d(img1, mSSIMWindow, torch::nn::functiona
 
 cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
 {
-    // tensor = tensor.squeeze().detach().permute({1, 2, 0});
-    tensor = tensor.detach().permute({1, 2, 0});
-    tensor = tensor.mul(255).clamp(0, 255).to(torch::kU8);
-    tensor = tensor.to(torch::kCPU);
-    int64_t height = tensor.size(0);
-    int64_t width = tensor.size(1);
-    cv::Mat mat = cv::Mat(height, width, CV_8UC3, tensor.data_ptr());
+    torch::Tensor detached_tensor = tensor.detach().clamp(0.f, 1.f) * 255;
+    detached_tensor = detached_tensor.to(torch::kUInt8);
+    detached_tensor = detached_tensor.permute({1, 2, 0}).contiguous().to(torch::kCPU);
+
+    int64_t height = detached_tensor.size(0);
+    int64_t width = detached_tensor.size(1);
+    cv::Mat mat = cv::Mat(height, width, CV_8UC3, detached_tensor.data_ptr());
 
     return mat.clone();
 }
@@ -860,9 +859,9 @@ torch::Tensor GaussianOptimizer::CVMatToTensor(cv::Mat mat)
     
     auto size = matFloat.size();
     auto nChannels = matFloat.channels();
-    auto tensor = torch::from_blob(matFloat.data, {size.height, size.width, nChannels});
+    auto tensor = torch::from_blob(matFloat.data, {size.height, size.width, nChannels}, torch::kFloat32);
 
-    return tensor.permute({2, 0, 1}).clone();
+    return tensor.clamp(0.f, 1.f).permute({2, 0, 1}).clone();
 }
 
 void GaussianOptimizer::TrainingSetup()
