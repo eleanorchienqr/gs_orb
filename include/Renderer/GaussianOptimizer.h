@@ -191,7 +191,7 @@ protected:
     bool mWhiteBackground = true;
     float mScaleModifier = 1.f;
     int mSHDegree = 3;
-    int mMaxSHDegree = 3;
+    int mMaxSHDegree = 0;
     int mActiveSHDegree = 0;
     bool mPrefiltered = false;
     float mNear = 0.01f;

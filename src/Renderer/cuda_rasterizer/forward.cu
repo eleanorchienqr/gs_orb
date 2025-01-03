@@ -9,8 +9,11 @@
  * For inquiries contact  george.drettakis@inria.fr
  */
 
+#include "stdio.h"
+
 #include "auxiliary.h"
 #include "forward.h"
+
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 namespace cg = cooperative_groups;
@@ -63,7 +66,17 @@ __device__ glm::vec3 computeColorFromSH(int idx, int deg, int max_coeffs, const 
     clamped[3 * idx + 0] = (result.x < 0);
     clamped[3 * idx + 1] = (result.y < 0);
     clamped[3 * idx + 2] = (result.z < 0);
-    return glm::max(result, 0.0f);
+
+    //Debug
+    glm::vec3 result_clamped;
+    result_clamped.x = fmaxf(result.x, 0.0f);
+    result_clamped.y = fmaxf(result.y, 0.0f);
+    result_clamped.z = fmaxf(result.z, 0.0f);
+    // printf("[renderCUDA] geoState.rgb/result [%4.2f, %4.2f, %4.2f] \n", result.x, result.y, result.z);
+    // printf("[renderCUDA] geoState.rgb/result_debug [%4.2f, %4.2f, %4.2f] \n", result_clamped.x, result_clamped.y, result_clamped.z);
+
+    // return glm::max(result, 0.0f);
+    return result_clamped;
 }
 
 // Forward version of 2D covariance matrix computation
@@ -232,8 +245,8 @@ __global__ void preprocessCUDA(int P, int D, int M,
         rgb[idx * C + 0] = result.x;
         rgb[idx * C + 1] = result.y;
         rgb[idx * C + 2] = result.z;
+        // printf("[renderCUDA] geoState.rgb [%4.2f, %4.2f, %4.2f] \n", result.x, result.y, result.z);
     }
-
     // Store some useful helper data for the next steps.
     depths[idx] = p_view.z;
     radii[idx] = my_radius;
@@ -341,6 +354,9 @@ __global__ void __launch_bounds__(BLOCK_X* BLOCK_Y)
             for (int ch = 0; ch < CHANNELS; ch++)
                 C[ch] = __fmaf_rn(features[collected_id[j] * CHANNELS + ch], __fmaf_rn(alpha, T, 0.f), C[ch]);
 
+
+            // printf("[renderCUDA] features [%4.2f, %4.2f, %4.2f] \n", features[collected_id[j] * CHANNELS], features[collected_id[j] * CHANNELS + 1], features[collected_id[j] * CHANNELS + 2]);
+            
             T = test_T;
 
             // Keep track of last range entry to update this
@@ -356,6 +372,7 @@ __global__ void __launch_bounds__(BLOCK_X* BLOCK_Y)
         n_contrib[pix_id] = last_contributor;
         for (int ch = 0; ch < CHANNELS; ch++)
             out_color[ch * H * W + pix_id] = __fmaf_rn(T, bg_color[ch], C[ch]);
+        
     }
 }
 

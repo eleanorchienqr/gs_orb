@@ -151,6 +151,7 @@ void GaussianOptimizer::InitializeOptimization(const std::vector<ORB_SLAM3::KeyF
     TrainingSetup();
     // Setup Loss Monitor
     mLossMonitor = new GaussianSplatting::LossMonitor(200);
+    // Setup SSIMparams
     mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
 }
 
@@ -198,22 +199,25 @@ void GaussianOptimizer::InitializeOptimization(ORB_SLAM3::KeyFrame* pKF)
     // Setup Optimizer
     TrainingSetupMonoGS();
 
-    // Setup Loss Monitor
+    // Setup SSIMparams
+    mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);
 }
 
 void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx, float fy)
 {
     const int FeaturestDim = std::pow(mSHDegree + 1, 2) - 1;
-    mSizeofGaussians = mImHeight * mImWidth;
+    mSizeofGaussians = mImHeight * mImWidth * (1.f / 32.f); // downsampling_factor
     // std::cout << "[GaussianSplatting::OptimizeMonoGS] InitializeGaussianFromRGBD: " << mSizeofGaussians << std::endl;
     const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
-    mMeans3D = torch::zeros({mSizeofGaussians, 3}, pointType).to(torch::kCUDA);
+    // Do not need downsampling
     mOpacity = ORB_SLAM3::Converter::InverseSigmoid(0.5 * torch::ones({mSizeofGaussians, 1}, pointType)).to(torch::kCUDA);
     mScales = torch::zeros({mSizeofGaussians, 3}, pointType).to(torch::kCUDA);
     mRotation = torch::zeros({mSizeofGaussians, 4}, pointType).to(torch::kCUDA);
-    mFeaturesDC = torch::zeros({mSizeofGaussians, 1, 3}, pointType).to(torch::kCUDA);
     mFeaturesRest = torch::zeros({mSizeofGaussians, FeaturestDim, 3}, pointType).to(torch::kCUDA);
+    // Need downsampling
+    mMeans3D = torch::zeros({mImHeight*mImWidth, 3}, pointType).to(torch::kCUDA);
+    mFeaturesDC = torch::zeros({mImHeight*mImWidth, 1, 3}, pointType).to(torch::kCUDA);
 
     std::cout << "[GaussianSplatting::OptimizeMonoGS] cx, cy, fx, fy, height, width: " << cx << ", "
                                                                                         << cy << ", "
@@ -259,20 +263,22 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
                 GauColor[0][0][1] = mTrainedImageTensor[1][j][i];
                 GauColor[0][0][2] = mTrainedImageTensor[2][j][i];
                 torch::Tensor GauColorSH = ORB_SLAM3::Converter::RGB2SH(GauColor).to(torch::kCUDA);
-
-                // if(float(GauColor[0][0][0]) > 1.f || float(GauColor[0][0][0]) < -1.f || GauColor[0][0][1] > 1.f || GauColor[0][0][1] < -1.f || GauColor[0][0][2] > 1.f || GauColor[0][0][2] < -1.f )
-                // if(float(GauColor[0][0][0].item()) > 1.f)
-                // {
-                //     std::cout << "[GaussianSplatting::OptimizeMonoGS] GauColor: " << GauColor  << std::endl;
-                //     std::cout << "[GaussianSplatting::OptimizeMonoGS] GauColorSH: " << GauColorSH  << std::endl;
-                // }
+                // std::cout << "[GaussianSplatting::OptimizeMonoGS] GauColorSH: " << GauColorSH  << std::endl;
 
                 mFeaturesDC.index_put_({GaussianIndex, torch::indexing::Slice(), torch::indexing::Slice()}, GauColorSH);
 
                 GaussianIndex += 1;
             }
-
         }
+
+        // PointCloud Downsampling
+        std::vector<int> PCIndices = GetRandomIndices(mImHeight * mImWidth);
+        std::vector<int> PCIndicesSelected(PCIndices.begin(), PCIndices.begin() + mSizeofGaussians);
+        torch::Tensor PointCloudIndicesTensor = torch::from_blob(PCIndicesSelected.data(), {mSizeofGaussians}, torch::kInt32).to(torch::kCUDA);
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] PointCloudIndicesTensor: " << PointCloudIndicesTensor << std::endl;
+
+        mMeans3D = mMeans3D.index_select(0, PointCloudIndicesTensor);
+        mFeaturesDC = mFeaturesDC.index_select(0, PointCloudIndicesTensor);
 
         // Scale initialization
         torch::Tensor dist2 = torch::clamp_min(distCUDA2(mMeans3D), 0.0000001);
@@ -281,9 +287,11 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
         // Rotation initialization
         mRotation.index_put_({torch::indexing::Slice(), 0}, 1.f);
 
-        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D  << std::endl;
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D.size(0)  << std::endl;
         // std::cout << "[GaussianSplatting::OptimizeMonoGS] mFeaturesDC: " << mFeaturesDC  << std::endl;
-        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mRotation: " << mRotation  << std::endl;
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mOpacity: " << mOpacity.size(0)  << std::endl;
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mScales: " << mScales.size(0)  << std::endl;
+        // std::cout << "[GaussianSplatting::OptimizeMonoGS] mRotation: " << mRotation.size(0)  << std::endl;
     }
 
 }
@@ -423,21 +431,21 @@ void GaussianOptimizer::OptimizeMonoGS()
         
         // Image debug
         // if(iter == mOptimParams.iterations)
-        if(iter == 1000)
+        if(iter == mOptimParams.iterations)
         {
             torch::NoGradGuard no_grad;
 
             cv::Mat RenderImg = TensorToCVMat(rendererd_image);
             cv::imwrite("MonoGS_InitialImage.png", RenderImg);
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image << std::endl;
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image.index({"...", 0, "..."}) << std::endl;
 
             cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
             cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;TrianedImg: " << TrianedImg << std::endl;
+            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;TrianedImg: " << mTrainedImageTensor.index({"...", 0, "..."}) << std::endl;
         }
 
         // Loss Computations
-        auto loss = L1Loss(rendererd_image, mTrainedImageTensor);
+        torch::Tensor loss = L1Loss(rendererd_image, mTrainedImageTensor);
         loss.backward(); 
 
         // Densify, prune and reset opacity
@@ -855,7 +863,7 @@ cv::Mat GaussianOptimizer::TensorToCVMat(torch::Tensor tensor)
 torch::Tensor GaussianOptimizer::CVMatToTensor(cv::Mat mat)
 {
     cv::Mat matFloat;
-    mat.convertTo(matFloat, CV_32F, 1.0 / 255);
+    mat.convertTo(matFloat, CV_32F, 1.f / 255.f);
     
     auto size = matFloat.size();
     auto nChannels = matFloat.channels();
