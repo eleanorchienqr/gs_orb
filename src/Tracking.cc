@@ -2895,6 +2895,11 @@ void Tracking::CreateInitialMapMonocular()
         pMP->AddObservation(pKFini,i);
         pMP->AddObservation(pKFcur,mvIniMatches[i]);
 
+        #ifdef GAUSSIANSPLATTING
+        pMP->GaussianInitialization(pKFini, i);
+        // pMP->GaussianInitialization(pKFcur, mvIniMatches[i]);
+        #endif
+
         pMP->ComputeDistinctiveDescriptors();
         pMP->UpdateNormalAndDepth();
 

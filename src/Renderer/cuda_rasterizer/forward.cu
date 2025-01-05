@@ -72,10 +72,7 @@ __device__ glm::vec3 computeColorFromSH(int idx, int deg, int max_coeffs, const 
     result_clamped.x = fmaxf(result.x, 0.0f);
     result_clamped.y = fmaxf(result.y, 0.0f);
     result_clamped.z = fmaxf(result.z, 0.0f);
-    // printf("[renderCUDA] geoState.rgb/result [%4.2f, %4.2f, %4.2f] \n", result.x, result.y, result.z);
-    // printf("[renderCUDA] geoState.rgb/result_debug [%4.2f, %4.2f, %4.2f] \n", result_clamped.x, result_clamped.y, result_clamped.z);
 
-    // return glm::max(result, 0.0f);
     return result_clamped;
 }
 

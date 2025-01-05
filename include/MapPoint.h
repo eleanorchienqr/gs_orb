@@ -127,6 +127,9 @@ public:
                            const torch::Tensor GauScale, const torch::Tensor GauOpacity, 
                            const torch::Tensor GauFeaturest, const torch::Tensor GauFeatureDC);
     void SetGauWorldPos(float invMedianDepth);
+    // Single Frame Gaussian Initialization
+    void GaussianInitialization(const KeyFrame* pKF, const int &idxF);
+    // void GaussianInitialization(MapPoint* pMP, std::vector<KeyFrame*> vpKF);
 
     // Gaussian Gettters
     long unsigned int GetGaussianNum();
