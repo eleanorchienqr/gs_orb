@@ -157,16 +157,26 @@ void MapPoint::GaussianInitialization(const KeyFrame* pKF, const int &idxF)
     const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
     const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
-
     Eigen::Vector3f Pos = GetWorldPos();
     Eigen::Vector3f PosTranspose = Pos.transpose();
     mGauWorldPos = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA, true);
     mGauWorldRot = torch::zeros({1, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
-    mGauScale = torch::zeros({1, 3}).to(torch::kCUDA, true); // Leave scales later in Optimization
+    mGauScale = torch::zeros({1, 3}).to(torch::kCUDA, true);                                                    // Leave scales later in Optimization
     mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({1, 1})).to(torch::kCUDA, true);
     mGauFeaturest = torch::zeros({1, FeaturestDim, 3}).to(torch::kCUDA, true);
-    // mGauFeatureDC = Converter::RGB2SH(torch::zeros({1, 1, 3})).to(torch::kCUDA, true);
 
+    const cv::KeyPoint &kpUn = pKF->mvKeysUn[idxF];
+    const int KeyPointPixel_x = (int)kpUn.pt.x;
+    const int KeyPointPixel_y = (int)kpUn.pt.y;
+
+    cv::Mat RGB = pKF->mImRGB;
+    float r = RGB.data[RGB.channels()*(RGB.cols*KeyPointPixel_y + KeyPointPixel_x) + 0]/255.f;
+    float g = RGB.data[RGB.channels()*(RGB.cols*KeyPointPixel_y + KeyPointPixel_x) + 1]/255.f;
+    float b = RGB.data[RGB.channels()*(RGB.cols*KeyPointPixel_y + KeyPointPixel_x) + 2]/255.f;
+    torch::Tensor rgb = torch::tensor({r, g, b});
+    mGauFeatureDC = Converter::RGB2SH(rgb.unsqueeze(0).unsqueeze(0)).to(torch::kCUDA, true); // [1, 1, 3]
+
+    // std::cout << "[GaussianInitialization Debug] KeyPoint mGauFeatureDC: " << mGauFeatureDC << std::endl;
     mGauNum = 1;
 
 }

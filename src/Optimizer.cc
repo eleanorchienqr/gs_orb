@@ -5816,4 +5816,9 @@ void Optimizer::GlobalGaussianOptimizationMonoGS(KeyFrame* pKF)
 
 }
 
+void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
+{
+
+}
+
 } //namespace ORB_SLAM

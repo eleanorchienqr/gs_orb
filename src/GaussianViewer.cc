@@ -139,11 +139,11 @@ void GaussianViewer::Run()
             texture.Unbind();
             // usleep(mT);
 
-            while(1)
-            {
-                if(mpLocalMapper->AcceptKeyFrames())
-                    break;
-            }
+            // while(1)
+            // {
+            //     if(mpLocalMapper->AcceptKeyFrames())
+            //         break;
+            // }
         }
     }
 

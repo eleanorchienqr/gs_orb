@@ -129,26 +129,37 @@ int main(int argc, char **argv)
 
         vTimesTrack[ni]=ttrack;
 
-#ifdef GAUSSIANSPLATTING
-        // Wait to load the next frame
-        double T=0;
-        if(ni<nImages-1)
-            T = vTimestamps[ni+1]-tframe;
-        else if(ni>0)
-            T = tframe-vTimestamps[ni-1];
+// #ifdef GAUSSIANSPLATTING
+//         // Wait to load the next frame
+//         double T=0;
+//         if(ni<nImages-1)
+//             T = vTimestamps[ni+1]-tframe;
+//         else if(ni>0)
+//             T = tframe-vTimestamps[ni-1];
         
-        std::cout << "T: " << T << std::endl;
-        std::cout << "ttrack: " << ttrack << std::endl;
+//         std::cout << "T: " << T << std::endl;
+//         std::cout << "ttrack: " << ttrack << std::endl;
 
-        if(ttrack<T)
-            usleep((T-ttrack)*1e6);
-        else
-        {
-        //     std::cout << "Waiting for tracking GS Optimization" << (ttrack-T)*1e6 << std::endl;
-            usleep((ttrack-T)*1e6);
-        }
+//         if(ttrack<T)
+//             usleep((T-ttrack)*1e6);
+//         else
+//         {
+//         //     std::cout << "Waiting for tracking GS Optimization" << (ttrack-T)*1e6 << std::endl;
+//             usleep((ttrack-T)*1e6);
+//         }
             
-#else
+// #else
+//         // Wait to load the next frame
+//         double T=0;
+//         if(ni<nImages-1)
+//             T = vTimestamps[ni+1]-tframe;
+//         else if(ni>0)
+//             T = tframe-vTimestamps[ni-1];
+
+//         if(ttrack<T)
+//             usleep((T-ttrack)*1e6);
+// #endif
+
         // Wait to load the next frame
         double T=0;
         if(ni<nImages-1)
@@ -158,7 +169,6 @@ int main(int argc, char **argv)
 
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
-#endif
     }
 
     // Stop all threads

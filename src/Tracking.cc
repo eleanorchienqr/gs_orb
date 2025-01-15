@@ -2924,8 +2924,10 @@ void Tracking::CreateInitialMapMonocular()
     Optimizer::GlobalBundleAdjustemnt(mpAtlas->GetCurrentMap(),20);
 
     #ifdef GAUSSIANSPLATTING
-    Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
-    Optimizer::GlobalGaussianOptimizationMonoGS(pKFini);
+    // Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
+    Optimizer::GlobalGaussianOptimizationInitFrame(pKFini);
+    // Optimizer::GlobalGaussianOptimization(pKFini);
+    // Optimizer::GlobalGaussianOptimizationMonoGS(pKFini);
     #endif
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
@@ -3639,11 +3641,11 @@ bool Tracking::NeedNewKeyFrameGS()
         nMinObs=2;
     int nRefMatches = mpReferenceKF->TrackedMapPoints(nMinObs);
 
-    while(1)
-    {
-        if(mpLocalMapper->AcceptKeyFrames())
-            break;
-    }
+    // while(1)
+    // {
+    //     if(mpLocalMapper->AcceptKeyFrames())
+    //         break;
+    // }
     
     // Local Mapping accept keyframes?
     bool bLocalMappingIdle = mpLocalMapper->AcceptKeyFrames();

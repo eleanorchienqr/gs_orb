@@ -343,11 +343,11 @@ void Viewer::Run()
         cv::imshow("ORB-SLAM3: Current Frame",toShow);
         cv::waitKey(mT);
 
-        while(1)
-        {
-            if(mpLocalMapper->AcceptKeyFrames())
-                break;
-        }
+        // while(1)
+        // {
+        //     if(mpLocalMapper->AcceptKeyFrames())
+        //         break;
+        // }
 
         if(menuReset)
         {

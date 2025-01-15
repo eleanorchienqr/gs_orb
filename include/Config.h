@@ -64,12 +64,12 @@ private:
 
 struct OptimizationParameters 
 {
-    size_t iterations = 3000; // 30'000 // MonoGS
+    size_t iterations = 30'000; // 30'000 // MonoGS
     // learning rate
-    float position_lr_init = 0.00016f; // MonoGS
+    float position_lr_init = 0.0016f; // MonoGS
     float position_lr_final = 0.0000016f; // MonoGS
     float position_lr_delay_mult = 0.01f;// MonoGS
-    int64_t position_lr_max_steps = 3000; // 30'000 // MonoGS
+    int64_t position_lr_max_steps = 30'000; // 30'000 // MonoGS
     float feature_lr = 0.0025f; // MonoGS
     float opacity_lr = 0.05f;// MonoGS
     float scaling_lr = 0.001f;// MonoGS
@@ -80,10 +80,10 @@ struct OptimizationParameters
     // densify, prune and reset opacity
     float percent_dense = 0.01f;  // MonoGS
     float min_opacity = 0.005f; // MonoGS
-    uint64_t densification_interval = 500; //10 // MonoGS
-    uint64_t opacity_reset_interval = 200; // 3'000 // MonoGS
-    uint64_t densify_from_iter = 50; // 500 // MonoGS
-    uint64_t densify_until_iter = 2000; // 15'000
+    uint64_t densification_interval = 100; //10 // MonoGS
+    uint64_t opacity_reset_interval = 3'000; // 3'000 // MonoGS
+    uint64_t densify_from_iter = 500; // 500 // MonoGS
+    uint64_t densify_until_iter = 15'000; // 15'000
     float densify_grad_threshold = 0.0002f; // MonoGS
     // other
     bool empty_gpu_cache = false;
@@ -92,7 +92,7 @@ struct OptimizationParameters
 
 struct MonoGSOptimizationParameters 
 {
-    size_t iterations = 30000; 
+    size_t iterations = 30'000; 
     // preprocess param
     int downsampling_factor = 32;
     // learning rate
