@@ -54,6 +54,10 @@ class GaussianOptimizer
 public:
     // Constructer
     GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &OptimParams);
+    GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams, const cv::Mat TrainedImage, const int ImHeight, const int ImWidth, 
+                      const float TanFovx, const float TanFovy, const float Fx, const float Fy, const float Cx, const float Cy, Sophus::SE3f& Tcw,
+                      const std::vector<long> vpGaussianRootIndex, const torch::Tensor pGauWorldPos, const torch::Tensor pGauOpacity, const torch::Tensor pGauScales, 
+                      const torch::Tensor pGauWorldRot, const torch::Tensor pGauFeatureDC, const torch::Tensor pGauFeaturest);
     GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams);
 
     // Optimization body

@@ -34,6 +34,7 @@
 #include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
 #include "Thirdparty/g2o/g2o/solvers/linear_solver_dense.h"
+#include <Thirdparty/simple-knn/spatial.h>
 #include "G2oTypes.h"
 #include "Converter.h"
 
@@ -5818,7 +5819,93 @@ void Optimizer::GlobalGaussianOptimizationMonoGS(KeyFrame* pKF)
 
 void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
 {
+    std::cout << "[GlobalGaussianOptimizationInitFrame Test]" << std::endl;
 
+    // 1. Preprocessing
+    vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
+
+    // 1.1 Image data [input]
+    cv::Mat pTrainedImage = pKF->mImRGB;
+
+    // 1.2 Camera data [input]
+    int pImHeight, pImWidth;
+    float pTanFovx, pTanFovy;
+
+    pKF->GetGaussianRenderParams(pImHeight, pImWidth, pTanFovx, pTanFovy);
+    Sophus::SE3f pTcw = pKF->GetPose();
+
+    // 1.3 Get Gaussian data
+    const int pSHDegree = 3;
+    const int FeaturestDim = std::pow(pSHDegree + 1, 2) - 1;
+    // const int FeaturestDim = 0;
+
+    int pGaussianNum = 0;
+    torch::Tensor pGauWorldPos;
+    torch::Tensor pGauOpacity;
+    torch::Tensor pGauScales;
+    torch::Tensor pGauWorldRot;
+    torch::Tensor pGauFeatureDC;
+    torch::Tensor pGauFeaturest;
+
+    std::vector<long> vpGaussianRootIndex;  // Binding Gaussians and MapPoints [input & output]
+
+    // 1.3.1 Count Gaussian numbers
+    for(int i = 0; i < vpMPs.size(); i++){
+        MapPoint* pMP = vpMPs[i];
+        if(pMP)
+            if(!pMP->isBad())
+                pGaussianNum += pMP->GetGaussianNum();
+    }
+
+    std::cout << ">>>[GlobalGaussianOptimizationInitFrame] The numbers of Gaussians in Init KeyFrame: " << pGaussianNum << std::endl;
+    
+    // 1.3.1 Initialize Gaussian Info tensors
+    pGauWorldPos = torch::zeros({pGaussianNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    pGauOpacity = torch::zeros({pGaussianNum, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    pGauScales = torch::zeros({pGaussianNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    pGauWorldRot = torch::zeros({pGaussianNum, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    pGauFeatureDC = torch::zeros({pGaussianNum, 1, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    pGauFeaturest = torch::zeros({pGaussianNum, FeaturestDim, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+
+    vpGaussianRootIndex = std::vector<long>(pGaussianNum, static_cast<long>(-1));
+    
+    {
+        torch::NoGradGuard no_grad;
+        int GaussianClusterIndex = 0;
+        for(int i = 0; i < vpMPs.size(); i++){
+            MapPoint* pMP = vpMPs[i];
+            if(pMP)
+                if(!pMP->isBad() && pMP->GetGaussianNum())
+                {
+                    int GaussianClusterNum = pMP->GetGaussianNum();
+
+                    pGauWorldPos.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+                    pGauOpacity.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauOpacity());
+                    pGauScales.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},   pMP->GetGauScale());
+                    pGauWorldRot.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()}, pMP->GetGauWorldRot());
+                    pGauFeatureDC.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeatureDC());
+                    pGauFeaturest.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice(), torch::indexing::Slice()}, pMP->GetGauFeaturest());
+
+                    for(int j = 0; j < GaussianClusterNum; j++)
+                        vpGaussianRootIndex[GaussianClusterIndex + j] = i;
+
+                    GaussianClusterIndex += GaussianClusterNum;
+                }
+        }
+
+        torch::Tensor dist2 = torch::clamp_min(distCUDA2(pGauWorldPos), 0.0000001);
+        pGauScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
+    }
+    
+    // 2. Main Gaussian optimization
+    ORB_SLAM3::MonoGSOptimizationParameters OptimParams;
+    GaussianSplatting::GaussianOptimizer optimizer(OptimParams, pTrainedImage, pImHeight, pImWidth, pTanFovx, pTanFovy, pKF->fx, pKF->fy, pKF->cx, pKF->cy, pTcw, // input
+                                                   vpGaussianRootIndex, pGauWorldPos, pGauOpacity, pGauScales, pGauWorldRot, pGauFeatureDC, pGauFeaturest);       // input & output);
+    optimizer.OptimizeMonoGS();
+
+    // 3. Recover optimized Gaussians to MapPoints [vpGaussianRootIndex]
+    // std::vector<std::vector<long>> vpGaussianIndices(vpMPs.size(), std::vector<long>(0));
+    // optimizer.GetGaussianData(vpGaussianRootIndex, GauWorldPos, GauOpacity, GauScales, GauWorldRot, GauFeatureDC, GauFeaturest);
+    // vpMPs->SetGaussianData(GauWorldPos, GauOpacity, GauScales, GauWorldRot, GauFeatureDC, GauFeaturest);
 }
-
 } //namespace ORB_SLAM

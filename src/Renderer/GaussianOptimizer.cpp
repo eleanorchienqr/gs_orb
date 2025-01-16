@@ -40,6 +40,45 @@ GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::OptimizationParameters &Op
 
 }
 
+
+GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams, const cv::Mat TrainedImage, const int ImHeight, const int ImWidth, 
+                                     const float TanFovx, const float TanFovy, const float Fx, const float Fy, const float Cx, const float Cy, Sophus::SE3f& Tcw,
+                                     const std::vector<long> vpGaussianRootIndex, const torch::Tensor pGauWorldPos, const torch::Tensor pGauOpacity, const torch::Tensor pGauScales, 
+                                     const torch::Tensor pGauWorldRot, const torch::Tensor pGauFeatureDC, const torch::Tensor pGauFeaturest):
+    mMonoGSOptimParams(OptimParams), mSHDegree(3),mTrainedImage(TrainedImage), mImHeight(ImHeight), mImWidth(ImWidth), mTanFovx(TanFovx), mTanFovy(TanFovy), mFx(Fx), mFy(Fy), mCx(Cx), mCy(Cy), 
+    mvpGaussianRootIndex(vpGaussianRootIndex), mMeans3D(pGauWorldPos), mOpacity(pGauOpacity), mScales(pGauScales), mRotation(pGauWorldRot), mFeaturesDC(pGauFeatureDC), mFeaturesRest(pGauFeaturest)
+{
+    // Gaussian num
+    mSizeofGaussians = pGauWorldPos.size(0);
+    
+    // Camera info
+    mProjMatrix = SetProjMatrixMonoGS().to(torch::kCUDA);                                                 // camera-to-NDC matrix
+    mViewMatrix = GetViewMatrix(Tcw).to(torch::kCUDA);                                                    // world-to-camera matrix
+    mFullProjMatrix = mViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0).to(torch::kCUDA); // world-to-camera matrix * camera-to-NDC matrix
+    mCameraCenter = mViewMatrix.inverse()[3].slice(0, 0, 3).to(torch::kCUDA);   
+    
+    // Image tensor
+    mTrainedImageTensor = CVMatToTensor(mTrainedImage).to(torch::kCUDA);                                  // [3, height, width]  
+
+    // Calculate cameras associated members for densification
+    mNerfNormTranslation = -mCameraCenter;
+    mNerfNormRadius = 0.0f;
+
+    // Setup Optimizer
+    TrainingSetupMonoGS();
+
+    // // // Setup SSIMparams
+    // mSSIMWindow = CreateWindow().to(torch::kFloat32).to(torch::kCUDA, true);       
+
+    // std::cout << "[GaussianSplatting::GaussianOptimizer] cx, cy, fx, fy, height, width: " << mCx << ", "
+    //                                                                                     << mCy << ", "
+    //                                                                                     << mFx << ", "
+    //                                                                                     << mFy << ", "
+    //                                                                                     << mImHeight << ", "
+    //                                                                                     << mImWidth << ", "
+    //                                                                                     << std::endl;                 
+}
+
 GaussianOptimizer::GaussianOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams):
     mMonoGSOptimParams(OptimParams)
 {
@@ -393,6 +432,8 @@ void GaussianOptimizer::OptimizeMonoGS()
     std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
 
     for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
+        
+        std::cout << ">>>>>>[GaussianOptimizer::OptimizeMonoGS] Iteration = " << iter << std::endl;
         
         // Set up rasterization configuration
         GaussianRasterizationSettings raster_settings = {
