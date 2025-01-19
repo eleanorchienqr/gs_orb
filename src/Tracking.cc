@@ -2925,9 +2925,10 @@ void Tracking::CreateInitialMapMonocular()
 
     #ifdef GAUSSIANSPLATTING
     // Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
-    Optimizer::GlobalGaussianOptimizationInitFrame(pKFini);
-    // Optimizer::GlobalGaussianOptimization(pKFini);
     // Optimizer::GlobalGaussianOptimizationMonoGS(pKFini);
+
+    Optimizer::GlobalGaussianOptimizationInitFrame(pKFini); // latest version
+    // Optimizer::GlobalGaussianOptimization(pKFini);
     #endif
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);

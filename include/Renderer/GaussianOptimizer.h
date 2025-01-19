@@ -117,6 +117,9 @@ public:
     torch::Tensor SSIM(const torch::Tensor& img1, const torch::Tensor& img2);
     torch::Tensor GaussianKernel1D(int window_size, float sigma);
 
+    // Evaluation function
+    float PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img);
+
     // Densification and prune
     void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
     void DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size);

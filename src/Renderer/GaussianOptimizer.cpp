@@ -482,7 +482,9 @@ void GaussianOptimizer::OptimizeMonoGS()
 
             cv::Mat TrianedImg = TensorToCVMat(mTrainedImageTensor);
             cv::imwrite("MonoGS_InitialTrainedImage.png", TrianedImg);
-            // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;TrianedImg: " << mTrainedImageTensor.index({"...", 0, "..."}) << std::endl;
+
+            float psnr = PSNR(rendererd_image, mTrainedImageTensor);
+            std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;psnr: " << psnr << std::endl;
         }
 
         // Loss Computations
@@ -1152,6 +1154,13 @@ void GaussianOptimizer::UpdateSHDegree()
 int GaussianOptimizer::GetActiveSHDegree()
 {
     return mActiveSHDegree;
+}
+
+// Evaluation function
+float GaussianOptimizer::PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img) {
+    torch::Tensor squared_diff = (rendered_img - gt_img).pow(2);
+    torch::Tensor mse_val = squared_diff.view({rendered_img.size(0), -1}).mean(1, true);
+    return (20.f * torch::log10(1.0 / mse_val.sqrt())).mean().item<float>();
 }
 
 }
