@@ -433,7 +433,7 @@ void GaussianOptimizer::OptimizeMonoGS()
 
     for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
         
-        std::cout << ">>>>>>[GaussianOptimizer::OptimizeMonoGS] Iteration = " << iter << std::endl;
+        // std::cout << ">>>>>>[GaussianOptimizer::OptimizeMonoGS] Iteration = " << iter << std::endl;
         
         // Set up rasterization configuration
         GaussianRasterizationSettings raster_settings = {
@@ -581,6 +581,7 @@ void GaussianOptimizer::UpdateIndiceForestAfterClone(const torch::Tensor indices
             mvpGaussianRootIndex[OriginalNodeNum + i] = mvpGaussianRootIndex[IndicesVec[i]];
             
         std::cout << "[GaussianSplatting::RootIndexSize] [AfterClone] " << mvpGaussianRootIndex.size() << std::endl;
+        // std::cout << "[GaussianSplatting::RootIndexSize] [AfterClone] " << mvpGaussianRootIndex << std::endl;
     }
 }
 
@@ -705,6 +706,7 @@ void GaussianOptimizer::UpdateIndiceForestAfterSplit(const torch::Tensor indices
         }
 
         std::cout << "[GaussianSplatting::RootIndexSize] [AfterSplit] " << mvpGaussianRootIndex.size() << std::endl;
+        // std::cout << "[GaussianSplatting::RootIndexSize] [AfterSplit] " << mvpGaussianRootIndex<< std::endl;
     }
 
 }
@@ -753,6 +755,7 @@ void GaussianOptimizer::UpdateIndiceForestAfterPrune(const torch::Tensor indices
         //     std::cout << "[GaussianSplatting::RootIndex] [AfterPrune] " << mvpGaussianRootIndex[i] << std::endl;
     
         std::cout << "[GaussianSplatting::RootIndexSize] [AfterPrune] " << mvpGaussianRootIndex.size() << std::endl;
+        // std::cout << "[GaussianSplatting::RootIndexSize] [AfterPrune] " << mvpGaussianRootIndex << std::endl;
     }
 
 }

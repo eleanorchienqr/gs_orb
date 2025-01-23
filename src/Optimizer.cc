@@ -5857,6 +5857,7 @@ void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
                 pGaussianNum += pMP->GetGaussianNum();
     }
 
+    std::cout << ">>>[GlobalGaussianOptimizationInitFrame] The size of MapPoints in Init KeyFrame: " << vpMPs.size() << std::endl;
     std::cout << ">>>[GlobalGaussianOptimizationInitFrame] The numbers of Gaussians in Init KeyFrame: " << pGaussianNum << std::endl;
     
     // 1.3.1 Initialize Gaussian Info tensors
@@ -5890,12 +5891,15 @@ void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
                         vpGaussianRootIndex[GaussianClusterIndex + j] = i;
 
                     GaussianClusterIndex += GaussianClusterNum;
+                    // std::cout << "[GlobalGaussianOptimizationInitFrame] Init vpGaussianRootIndex: " << i << std::endl;
+                    
                 }
         }
 
         torch::Tensor dist2 = torch::clamp_min(distCUDA2(pGauWorldPos), 0.0000001);
         pGauScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
     }
+    // std::cout << "[GlobalGaussianOptimizationInitFrame] Init vpGaussianRootIndex: " << vpGaussianRootIndex << std::endl;
     
     // 2. Main Gaussian optimization
     ORB_SLAM3::MonoGSOptimizationParameters OptimParams;
@@ -5904,8 +5908,56 @@ void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
     optimizer.OptimizeMonoGS();
 
     // 3. Recover optimized Gaussians to MapPoints [vpGaussianRootIndex]
-    // std::vector<std::vector<long>> vpGaussianIndices(vpMPs.size(), std::vector<long>(0));
-    // optimizer.GetGaussianData(vpGaussianRootIndex, GauWorldPos, GauOpacity, GauScales, GauWorldRot, GauFeatureDC, GauFeaturest);
-    // vpMPs->SetGaussianData(GauWorldPos, GauOpacity, GauScales, GauWorldRot, GauFeatureDC, GauFeaturest);
+    // 3.1 Get data from optimizer
+    std::vector<std::vector<long>> vpGaussianIndices(vpMPs.size(), std::vector<long>(0));
+    vpGaussianRootIndex = optimizer.GetGaussianRootIndex();
+    std::cout << ">>>[GlobalGaussianOptimizationInitFrame] vpGaussianRootIndex: " << vpGaussianRootIndex << std::endl;
+
+    for(int i = 0; i < vpGaussianRootIndex.size(); i++)
+    {
+        for(int j = 0; j < vpMPs.size(); j++)
+        {
+            if(vpGaussianRootIndex[i] == j)
+                vpGaussianIndices[j].push_back(i); 
+        }
+    }
+
+    pGauWorldPos = optimizer.GetWorldPos(); 
+    pGauOpacity = optimizer.GetOpacity(); 
+    pGauScales = optimizer.GetScale(); 
+    pGauWorldRot = optimizer.GetWorldRot(); 
+    pGauFeatureDC = optimizer.GetFeatureDC(); 
+    pGauFeaturest = optimizer.GetFeaturest(); 
+
+    // 3.2 Send data back to MapPoints
+    for(int i = 0; i < vpMPs.size(); i++)
+    {
+        std::vector<long> vpGaussianIndex = vpGaussianIndices[i];
+        const long GauNum = vpGaussianIndex.size();
+
+        MapPoint* pMP = vpMPs[i];
+
+        if(pMP)
+        {
+            if(!pMP->isBad() && GauNum)
+            {
+                pMP->ResetGauAttributes(GauNum);
+                torch::Tensor vpGaussianIndexTensor = torch::from_blob(vpGaussianIndex.data(), {(int)GauNum}, torch::kLong).to(torch::kCUDA);
+                // std::cout << "[AfterOptimization::MapPoint Index] " << i << " , GaussianIndex: " << vpGaussianIndexTensor << std::endl;
+                torch::Tensor vpGauWorldPos = pGauWorldPos.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauWorldRot = pGauWorldRot.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauScale = pGauScales.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauOpacity = pGauOpacity.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauFeaturest = pGauFeaturest.index_select(0, vpGaussianIndexTensor); 
+                torch::Tensor vpGauFeatureDC = pGauFeatureDC.index_select(0, vpGaussianIndexTensor); 
+                // std::cout << "[AfterOptimization:GauFeatureDC] " << vpGauFeatureDC << std::endl;
+                pMP->SetGauAttributes(vpGauWorldPos, vpGauWorldRot, vpGauScale, vpGauOpacity, vpGauFeaturest, vpGauFeatureDC);
+            }
+            // else
+            // {
+            //     pMP->InitializeGaussianCluster(pMP->GetWorldPos());
+            // }
+        }
+    }
 }
 } //namespace ORB_SLAM
