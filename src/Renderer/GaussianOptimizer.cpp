@@ -324,7 +324,7 @@ void GaussianOptimizer::InitializeGaussianFromRGBD(float cx, float cy, float fx,
         mScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
 
         // Rotation initialization
-        mRotation.index_put_({torch::indexing::Slice(), 0}, 1.f);
+        mRotation.index_put_({torch::indexing::Slice(), 0}, 1.f); 
 
         // std::cout << "[GaussianSplatting::OptimizeMonoGS] mMeans3D: " << mMeans3D.size(0)  << std::endl;
         // std::cout << "[GaussianSplatting::OptimizeMonoGS] mFeaturesDC: " << mFeaturesDC  << std::endl;
@@ -396,6 +396,23 @@ void GaussianOptimizer::Optimize()
 
         { 
             torch::NoGradGuard no_grad;
+
+            // Image debug
+            if(iter == mOptimParams.iterations)
+            {
+                torch::NoGradGuard no_grad;
+
+                cv::Mat RenderImg = TensorToCVMat(rendererd_image);
+                cv::imwrite("LocalBA_InitialImage.png", RenderImg);
+                // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image.index({"...", 0, "..."}) << std::endl;
+
+                cv::Mat TrianedImg = TensorToCVMat(GTImg);
+                cv::imwrite("LocalBA_InitialTrainedImage.png", TrianedImg);
+
+                float psnr = PSNR(rendererd_image, GTImg);
+                std::cout << "[GaussianOptimizer::Optimize] Debug;psnr: " << psnr << std::endl;
+            }
+            
             // Densification
             if (iter < mOptimParams.densify_until_iter) {
                 torch::Tensor VisibilityFilter = radii > 0;

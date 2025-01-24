@@ -62,14 +62,44 @@ private:
 
 };
 
+class GaussianOptimConfig
+{
+
+private:
+    size_t iterations = 3000; // 30'000 // MonoGS
+    // learning rate
+    float mPosLrInit = 0.0016f; // MonoGS
+    float mPosLrFinal = 0.0000016f; // MonoGS
+    float mPosLrDelayMult = 0.01f;// MonoGS
+    int64_t mPosLrMaxSteps = 30000; // 30'000 // MonoGS
+    float mFeatureLr = 0.0025f; // MonoGS
+    float mOpacityLr = 0.05f;// MonoGS
+    float mScalingLr = 0.001f;// MonoGS
+    float mRotationLr = 0.001f;// MonoGS
+    // loss
+    float mLambdaDssim = 0.2f;
+    // float convergence_threshold = 0.007f;
+    // densify, prune and reset opacity
+    float mPercentDense = 0.01f;  // MonoGS
+    float mMinOpacity = 0.005f; // MonoGS
+    uint64_t mDensificationInterval = 10; //10 // MonoGS
+    uint64_t mOpacityResetInterval = 300; // 3'000 // MonoGS
+    uint64_t mDensifyFromIter = 50; // 500 // MonoGS
+    uint64_t mDensifyUntilIter = 1500; // 15'000
+    float mDensifyGradThreshold = 0.0002f; // MonoGS
+    // other
+    bool mEmptyGpuCache = false;
+    bool mEarlyrStopping = false;
+};
+
 struct OptimizationParameters 
 {
-    size_t iterations = 30'000; // 30'000 // MonoGS
+    size_t iterations = 3000; // 30'000 // MonoGS
     // learning rate
     float position_lr_init = 0.0016f; // MonoGS
     float position_lr_final = 0.0000016f; // MonoGS
     float position_lr_delay_mult = 0.01f;// MonoGS
-    int64_t position_lr_max_steps = 30'000; // 30'000 // MonoGS
+    int64_t position_lr_max_steps = 30000; // 30'000 // MonoGS
     float feature_lr = 0.0025f; // MonoGS
     float opacity_lr = 0.05f;// MonoGS
     float scaling_lr = 0.001f;// MonoGS
@@ -80,10 +110,10 @@ struct OptimizationParameters
     // densify, prune and reset opacity
     float percent_dense = 0.01f;  // MonoGS
     float min_opacity = 0.005f; // MonoGS
-    uint64_t densification_interval = 100; //10 // MonoGS
-    uint64_t opacity_reset_interval = 3'000; // 3'000 // MonoGS
-    uint64_t densify_from_iter = 500; // 500 // MonoGS
-    uint64_t densify_until_iter = 15'000; // 15'000
+    uint64_t densification_interval = 10; //10 // MonoGS
+    uint64_t opacity_reset_interval = 300; // 3'000 // MonoGS
+    uint64_t densify_from_iter = 50; // 500 // MonoGS
+    uint64_t densify_until_iter = 1500; // 15'000
     float densify_grad_threshold = 0.0002f; // MonoGS
     // other
     bool empty_gpu_cache = false;
