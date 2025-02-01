@@ -129,6 +129,7 @@ public:
     void SetGauWorldPos(float invMedianDepth);
     // Single Frame Gaussian Initialization
     void GaussianInitialization(const KeyFrame* pKF, const int &idxF);
+    void GaussianInitializationCluster(const KeyFrame* pKF, const int &idxF);
     // void GaussianInitialization(MapPoint* pMP, std::vector<KeyFrame*> vpKF);
 
     // Gaussian Gettters
@@ -237,7 +238,7 @@ public:
 protected:    
 
     // Gaussian Members, serialization ?
-    long unsigned int mGauNum = 0;
+    long int mGauNum = 0;
     long unsigned int mGauSHDegree = 3;
 
     torch::Tensor mGauWorldPos;            // {mGauNum, 3}

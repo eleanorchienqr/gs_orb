@@ -2896,7 +2896,8 @@ void Tracking::CreateInitialMapMonocular()
         pMP->AddObservation(pKFcur,mvIniMatches[i]);
 
         #ifdef GAUSSIANSPLATTING
-        pMP->GaussianInitialization(pKFini, i);
+        // pMP->GaussianInitialization(pKFini, i);
+        pMP->GaussianInitializationCluster(pKFini, i);
         // pMP->GaussianInitialization(pKFcur, mvIniMatches[i]);
         #endif
 

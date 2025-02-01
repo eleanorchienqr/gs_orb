@@ -94,7 +94,7 @@ private:
 
 struct OptimizationParameters 
 {
-    size_t iterations = 3000; // 30'000 // MonoGS
+    size_t iterations = 150; // 30'000 // MonoGS
     // learning rate
     float position_lr_init = 0.0016f; // MonoGS
     float position_lr_final = 0.0000016f; // MonoGS
@@ -110,10 +110,10 @@ struct OptimizationParameters
     // densify, prune and reset opacity
     float percent_dense = 0.01f;  // MonoGS
     float min_opacity = 0.005f; // MonoGS
-    uint64_t densification_interval = 10; //10 // MonoGS
+    uint64_t densification_interval = 150; //10 // MonoGS
     uint64_t opacity_reset_interval = 300; // 3'000 // MonoGS
-    uint64_t densify_from_iter = 50; // 500 // MonoGS
-    uint64_t densify_until_iter = 1500; // 15'000
+    uint64_t densify_from_iter = 0; // 500 // MonoGS
+    uint64_t densify_until_iter = 150; // 15'000
     float densify_grad_threshold = 0.0002f; // MonoGS
     // other
     bool empty_gpu_cache = false;
@@ -122,7 +122,7 @@ struct OptimizationParameters
 
 struct MonoGSOptimizationParameters 
 {
-    size_t iterations = 30'000; 
+    size_t iterations = 1050; 
     // preprocess param
     int downsampling_factor = 32;
     // learning rate
@@ -141,9 +141,9 @@ struct MonoGSOptimizationParameters
     float percent_dense = 0.01f;  
     float min_opacity = 0.005f;
     uint64_t densification_interval = 100; 
-    uint64_t opacity_reset_interval = 3000; 
-    uint64_t densify_from_iter = 500; 
-    uint64_t densify_until_iter = 15000; 
+    uint64_t opacity_reset_interval = 500; 
+    uint64_t densify_from_iter = 0; 
+    uint64_t densify_until_iter = 1050; 
     float densify_grad_threshold = 0.0002f; 
     // other
     bool empty_gpu_cache = false;

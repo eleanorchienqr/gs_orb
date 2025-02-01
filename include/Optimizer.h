@@ -100,7 +100,7 @@ public:
     void static InertialOptimization(Map *pMap, Eigen::Matrix3d &Rwg, double &scale);
 
     // GaussianCluster Optimization
-    // void static GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale);
+    void static GlobalGaussianOptimization(Map* pMap, int nIterations, const bool bInitializeScale);
     void static GlobalGaussianOptimizationInitFrame(KeyFrame* pKF);
     void static GaussianOptimization(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP, Map *pMap, int nIterations, const bool bInitializeScale,
                                      std::vector<long> &GaussianRootIndex, std::vector<std::vector<long>> &GaussianIndices, torch::Tensor &GauWorldPos, torch::Tensor &GauOpacity,
@@ -108,7 +108,7 @@ public:
     void static LocalGaussianOptimization(KeyFrame* pKF, Map *pMap);
 
     // Gaussian Optimization Fine Tune
-    // void static GlobalGaussianOptimizationMonoGS(KeyFrame* pKF);
+    void static GlobalGaussianOptimizationMonoGS(KeyFrame* pKF);
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 

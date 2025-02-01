@@ -181,6 +181,74 @@ void MapPoint::GaussianInitialization(const KeyFrame* pKF, const int &idxF)
 
 }
 
+void MapPoint::GaussianInitializationCluster(const KeyFrame* pKF, const int &idxF)
+{
+    // Get keypoint coord
+    const cv::KeyPoint &kpUn = pKF->mvKeysUn[idxF];
+    const int KeyPointPixel_x = (int)kpUn.pt.x;
+    const int KeyPointPixel_y = (int)kpUn.pt.y;
+    // Get rgb img
+    cv::Mat RGB = pKF->mImRGB;
+
+    // Set Patch data
+    int PatchSize = 1;
+    int PatchRoght = std::min(RGB.cols, KeyPointPixel_x + PatchSize);
+    int PatchLeft = std::max(0, KeyPointPixel_x - PatchSize);
+    int PatchtUp = std::min(RGB.rows, KeyPointPixel_y + PatchSize);
+    int PatchLDown = std::max(0, KeyPointPixel_y - PatchSize);
+
+    int PatchWidth = PatchRoght - PatchLeft;
+    int PatchHeight = PatchtUp - PatchLDown;
+
+    // Set data type
+    const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
+    const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
+
+    // Get pos data from MapPoint
+    Eigen::Vector3f Pos = GetWorldPos();
+    Eigen::Vector3f PosTranspose = Pos.transpose();
+    torch::Tensor PosTensor = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA, true);
+
+    mGauNum = PatchWidth * PatchHeight;
+    mGauWorldPos = torch::zeros({mGauNum, 3}).to(torch::kCUDA, true);
+    mGauWorldRot = torch::zeros({mGauNum, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
+    mGauScale = torch::zeros({mGauNum, 3}).to(torch::kCUDA, true);         // Leave scales later in Optimization
+    mGauOpacity = Converter::InverseSigmoid(0.5 * torch::ones({mGauNum, 1})).to(torch::kCUDA, true);
+    mGauFeaturest = torch::zeros({mGauNum, FeaturestDim, 3}).to(torch::kCUDA, true);
+    mGauFeatureDC = torch::zeros({mGauNum, 1, 3}).to(torch::kCUDA, true); // [mGauNum, 1, 3]
+
+    int PatchId = 0;
+    for(int coord_x = PatchLeft; coord_x < PatchRoght; coord_x++)
+    {
+        for(int coord_y = PatchLDown; coord_y < PatchtUp; coord_y++)
+        {
+            // Fill up world pos with random perturbation
+            torch::Tensor GauWorldPos = PosTensor + torch::randn({1, 3}).to(torch::kCUDA, true) * 0.1;
+
+            // std::cout << "[GaussianInitializationCluster Debug] mGauNum: " << mGauNum << std::endl;
+            // std::cout << "[GaussianInitializationCluster Debug] PatchId: " << PatchId << std::endl;
+            // std::cout << "[GaussianInitializationCluster Debug] KeyPoint GauWorldPos: " << GauWorldPos << std::endl;
+            // std::cout << "[GaussianInitializationCluster Debug] KeyPoint mGauWorldPos: " << mGauWorldPos << std::endl;
+            
+            mGauWorldPos.index_put_({PatchId, torch::indexing::Slice()}, GauWorldPos);
+
+            // Fill up rgb value of cluster
+            float r = RGB.data[RGB.channels()*(RGB.cols*coord_y + coord_x) + 0]/255.f;
+            float g = RGB.data[RGB.channels()*(RGB.cols*coord_y + coord_x) + 1]/255.f;
+            float b = RGB.data[RGB.channels()*(RGB.cols*coord_y + coord_x) + 2]/255.f;
+            torch::Tensor rgb = torch::tensor({r, g, b});
+            torch::Tensor GauFeatureDC = Converter::RGB2SH(rgb.unsqueeze(0).unsqueeze(0)).to(torch::kCUDA, true); // [1, 1, 3]
+
+            mGauFeatureDC.index_put_({PatchId, torch::indexing::Slice(), torch::indexing::Slice()}, GauFeatureDC);
+
+            PatchId += 1;
+        }
+    }
+
+    std::cout << "[GaussianInitialization Debug] KeyPoint mGauFeatureDC: " << mGauFeatureDC << std::endl;
+    std::cout << "[GaussianInitialization Debug] KeyPoint mGauWorldPos: " << mGauWorldPos << std::endl;
+}
+
 void MapPoint::ResetGauAttributes(const long GauNum)
 {
     unique_lock<mutex> lock2(mGlobalMutex);
