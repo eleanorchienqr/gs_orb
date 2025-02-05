@@ -181,7 +181,7 @@ void MapPoint::GaussianInitialization(const KeyFrame* pKF, const int &idxF)
 
 }
 
-void MapPoint::GaussianInitializationCluster(const KeyFrame* pKF, const int &idxF)
+void MapPoint::GaussianInitializationCluster(KeyFrame* pKF, const int &idxF)
 {
     // Get keypoint coord
     const cv::KeyPoint &kpUn = pKF->mvKeysUn[idxF];
@@ -191,7 +191,7 @@ void MapPoint::GaussianInitializationCluster(const KeyFrame* pKF, const int &idx
     cv::Mat RGB = pKF->mImRGB;
 
     // Set Patch data
-    int PatchSize = 1;
+    int PatchSize = 4;
     int PatchRoght = std::min(RGB.cols, KeyPointPixel_x + PatchSize);
     int PatchLeft = std::max(0, KeyPointPixel_x - PatchSize);
     int PatchtUp = std::min(RGB.rows, KeyPointPixel_y + PatchSize);
@@ -204,11 +204,33 @@ void MapPoint::GaussianInitializationCluster(const KeyFrame* pKF, const int &idx
     const int FeaturestDim = std::pow(mGauSHDegree + 1, 2) - 1;
     const auto pointType = torch::TensorOptions().dtype(torch::kFloat32);
 
-    // Get pos data from MapPoint
+    // Get pos and depth from MapPoint
     Eigen::Vector3f Pos = GetWorldPos();
+    Eigen::Vector3f PC = Pos - pKF->GetCameraCenter();
+    const float depth = PC.norm();
+    // std::cout << "[GaussianInitializationCluster Debug] KeyPoint depth: " << depth << std::endl;
+
     Eigen::Vector3f PosTranspose = Pos.transpose();
     torch::Tensor PosTensor = torch::from_blob(PosTranspose.data(), {1, 3}, pointType).to(torch::kCUDA, true);
+    
+    // Get extrinsic and intrinsic params
+    Sophus::SE3f Tcw = pKF->GetPose();
+    const float cx = pKF->cx;
+    const float cy = pKF->cy;
+    const float fx = pKF->fx;
+    const float fy = pKF->fy;
 
+    Eigen::Matrix<float,3,3> Rcw = Tcw.rotationMatrix();
+    Eigen::Matrix<float,3,1> tcw = Tcw.translation();
+
+    Eigen::Matrix4f C2W = Eigen::Matrix4f::Zero();
+    C2W.block<3, 3>(0, 0) = Rcw;
+    C2W.block<3, 1>(0, 3) = tcw;
+    C2W(3, 3) = 1.0;
+    torch::Tensor View2WorldMatrix = torch::from_blob(C2W.data(), {4, 4}, torch::kFloat).to(torch::kCUDA, true);
+    // std::cout << "[GaussianInitializationCluster Debug] View2WorldMatrix: " << View2WorldMatrix << std::endl;
+
+    // Initialize Gaus
     mGauNum = PatchWidth * PatchHeight;
     mGauWorldPos = torch::zeros({mGauNum, 3}).to(torch::kCUDA, true);
     mGauWorldRot = torch::zeros({mGauNum, 4}).index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
@@ -223,7 +245,19 @@ void MapPoint::GaussianInitializationCluster(const KeyFrame* pKF, const int &idx
         for(int coord_y = PatchLDown; coord_y < PatchtUp; coord_y++)
         {
             // Fill up world pos with random perturbation
-            torch::Tensor GauWorldPos = PosTensor + torch::randn({1, 3}).to(torch::kCUDA, true) * 0.1;
+            // torch::Tensor GauWorldPos = PosTensor + torch::randn({1, 3}).to(torch::kCUDA, true) * 0.1;
+            torch::Tensor PertubDepth = torch::randn({1}, pointType).to(torch::kCUDA, true) * 0.1 * depth + torch::ones({1}, pointType).to(torch::kCUDA, true) * depth;
+            torch::Tensor CameraCoord = torch::ones({3}, pointType).to(torch::kCUDA, true);
+                
+            CameraCoord[0] = PertubDepth[0] * (coord_x-cx)/fx;
+            CameraCoord[1] = PertubDepth[0] * (coord_y-cy)/fy;
+            CameraCoord[2] = PertubDepth[0];
+            // std::cout << "[GaussianInitializationCluster Debug] CameraCoord: " << CameraCoord << std::endl;
+
+            torch::Tensor GauWorldPos = torch::ones({1, 3}, pointType).to(torch::kCUDA, true);
+            GauWorldPos[0][0] = View2WorldMatrix[0][0]*CameraCoord[0] + View2WorldMatrix[0][1]*CameraCoord[1] + View2WorldMatrix[0][2]*CameraCoord[2] + View2WorldMatrix[3][0];
+            GauWorldPos[0][1] = View2WorldMatrix[1][0]*CameraCoord[0] + View2WorldMatrix[1][1]*CameraCoord[1] + View2WorldMatrix[1][2]*CameraCoord[2] + View2WorldMatrix[3][1];
+            GauWorldPos[0][2] = View2WorldMatrix[2][0]*CameraCoord[0] + View2WorldMatrix[2][1]*CameraCoord[1] + View2WorldMatrix[2][2]*CameraCoord[2] + View2WorldMatrix[3][2];
 
             // std::cout << "[GaussianInitializationCluster Debug] mGauNum: " << mGauNum << std::endl;
             // std::cout << "[GaussianInitializationCluster Debug] PatchId: " << PatchId << std::endl;

@@ -122,7 +122,7 @@ struct OptimizationParameters
 
 struct MonoGSOptimizationParameters 
 {
-    size_t iterations = 1050; 
+    size_t iterations = 1050;  // 1050
     // preprocess param
     int downsampling_factor = 32;
     // learning rate

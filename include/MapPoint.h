@@ -129,7 +129,7 @@ public:
     void SetGauWorldPos(float invMedianDepth);
     // Single Frame Gaussian Initialization
     void GaussianInitialization(const KeyFrame* pKF, const int &idxF);
-    void GaussianInitializationCluster(const KeyFrame* pKF, const int &idxF);
+    void GaussianInitializationCluster(KeyFrame* pKF, const int &idxF);
     // void GaussianInitialization(MapPoint* pMP, std::vector<KeyFrame*> vpKF);
 
     // Gaussian Gettters
