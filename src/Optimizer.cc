@@ -5911,7 +5911,7 @@ void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
     // 3.1 Get data from optimizer
     std::vector<std::vector<long>> vpGaussianIndices(vpMPs.size(), std::vector<long>(0));
     vpGaussianRootIndex = optimizer.GetGaussianRootIndex();
-    std::cout << ">>>[GlobalGaussianOptimizationInitFrame] vpGaussianRootIndex: " << vpGaussianRootIndex << std::endl;
+    // std::cout << ">>>[GlobalGaussianOptimizationInitFrame] vpGaussianRootIndex: " << vpGaussianRootIndex << std::endl;
 
     for(int i = 0; i < vpGaussianRootIndex.size(); i++)
     {

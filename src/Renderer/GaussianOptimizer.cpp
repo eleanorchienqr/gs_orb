@@ -505,7 +505,8 @@ void GaussianOptimizer::OptimizeMonoGS()
         }
 
         // Loss Computations
-        torch::Tensor loss = L1Loss(rendererd_image, mTrainedImageTensor);
+        // torch::Tensor loss = L1Loss(rendererd_image, mTrainedImageTensor);
+        torch::Tensor loss = L1LossWithMask(rendererd_image, mTrainedImageTensor, 0.01);
         loss.backward(); 
 
         // Densify, prune and reset opacity
@@ -890,9 +891,23 @@ torch::Tensor GaussianOptimizer::GetFeatureDC(const torch::Tensor indices)
     return SelectTensor.clone();
 }
 
-torch::Tensor GaussianOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) {
-        return torch::abs((network_output - gt)).mean();
-    }
+torch::Tensor GaussianOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) 
+{
+    return torch::abs((network_output - gt)).mean();
+}
+
+torch::Tensor GaussianOptimizer::L1LossWithMask(const torch::Tensor& network_output, const torch::Tensor& gt, const float th)
+{
+    // Image shape [3, height, width]
+    // th = 0.01;
+
+    const int Height = gt.size(1);
+    const int Width = gt.size(2);
+
+    torch::Tensor rgb_pixel_mask = (gt.sum(0) > th).view({1, Height, Width});
+    // std::cout << "[L1LossWithMask Debug] rgb_pixel_mask" << rgb_pixel_mask << std::endl;
+    return torch::abs(network_output * rgb_pixel_mask - gt * rgb_pixel_mask).mean();
+}
 
 torch::Tensor GaussianOptimizer::SSIM(const torch::Tensor& img1, const torch::Tensor& img2) {
 auto mu1 = torch::nn::functional::conv2d(img1, mSSIMWindow, torch::nn::functional::Conv2dFuncOptions().padding(mWindowSize / 2).groups(mChannel));

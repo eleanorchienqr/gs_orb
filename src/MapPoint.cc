@@ -228,7 +228,6 @@ void MapPoint::GaussianInitializationCluster(KeyFrame* pKF, const int &idxF)
     C2W.block<3, 1>(0, 3) = tcw;
     C2W(3, 3) = 1.0;
     torch::Tensor View2WorldMatrix = torch::from_blob(C2W.data(), {4, 4}, torch::kFloat).to(torch::kCUDA, true);
-    // std::cout << "[GaussianInitializationCluster Debug] View2WorldMatrix: " << View2WorldMatrix << std::endl;
 
     // Initialize Gaus
     mGauNum = PatchWidth * PatchHeight;
@@ -258,11 +257,6 @@ void MapPoint::GaussianInitializationCluster(KeyFrame* pKF, const int &idxF)
             GauWorldPos[0][0] = View2WorldMatrix[0][0]*CameraCoord[0] + View2WorldMatrix[0][1]*CameraCoord[1] + View2WorldMatrix[0][2]*CameraCoord[2] + View2WorldMatrix[3][0];
             GauWorldPos[0][1] = View2WorldMatrix[1][0]*CameraCoord[0] + View2WorldMatrix[1][1]*CameraCoord[1] + View2WorldMatrix[1][2]*CameraCoord[2] + View2WorldMatrix[3][1];
             GauWorldPos[0][2] = View2WorldMatrix[2][0]*CameraCoord[0] + View2WorldMatrix[2][1]*CameraCoord[1] + View2WorldMatrix[2][2]*CameraCoord[2] + View2WorldMatrix[3][2];
-
-            // std::cout << "[GaussianInitializationCluster Debug] mGauNum: " << mGauNum << std::endl;
-            // std::cout << "[GaussianInitializationCluster Debug] PatchId: " << PatchId << std::endl;
-            // std::cout << "[GaussianInitializationCluster Debug] KeyPoint GauWorldPos: " << GauWorldPos << std::endl;
-            // std::cout << "[GaussianInitializationCluster Debug] KeyPoint mGauWorldPos: " << mGauWorldPos << std::endl;
             
             mGauWorldPos.index_put_({PatchId, torch::indexing::Slice()}, GauWorldPos);
 
@@ -279,8 +273,8 @@ void MapPoint::GaussianInitializationCluster(KeyFrame* pKF, const int &idxF)
         }
     }
 
-    std::cout << "[GaussianInitialization Debug] KeyPoint mGauFeatureDC: " << mGauFeatureDC << std::endl;
-    std::cout << "[GaussianInitialization Debug] KeyPoint mGauWorldPos: " << mGauWorldPos << std::endl;
+    // std::cout << "[GaussianInitialization Debug] KeyPoint mGauFeatureDC: " << mGauFeatureDC << std::endl;
+    // std::cout << "[GaussianInitialization Debug] KeyPoint mGauWorldPos: " << mGauWorldPos << std::endl;
 }
 
 void MapPoint::ResetGauAttributes(const long GauNum)

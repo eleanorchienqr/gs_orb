@@ -114,6 +114,7 @@ public:
     // Loss functions
     torch::Tensor CreateWindow();
     torch::Tensor L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt);
+    torch::Tensor L1LossWithMask(const torch::Tensor& network_output, const torch::Tensor& gt, const float th);
     torch::Tensor SSIM(const torch::Tensor& img1, const torch::Tensor& img2);
     torch::Tensor GaussianKernel1D(int window_size, float sigma);
 
