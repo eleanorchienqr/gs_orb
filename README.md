@@ -54,6 +54,8 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local -D INSTALL_
 
 Python version should be checked. Version 3.7 is tested fine.
 
+`ceres-solver-1.14.0`, `glfw-3.4`, `Pangolin-0.8`, `eigen-3.4.0`
+
 ```
 cmake -DGAUSSIANSPLATTING=ON ..
 ```
