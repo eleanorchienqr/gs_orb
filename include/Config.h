@@ -140,8 +140,8 @@ struct MonoGSOptimizationParameters
     // densify, prune and reset opacity
     float percent_dense = 0.01f;  
     float min_opacity = 0.005f;
-    uint64_t densification_interval = 100; 
-    uint64_t opacity_reset_interval = 500; 
+    uint64_t densification_interval = 100; // 100
+    uint64_t opacity_reset_interval = 500; // 500
     uint64_t densify_from_iter = 0; 
     uint64_t densify_until_iter = 1050; 
     float densify_grad_threshold = 0.0002f; 

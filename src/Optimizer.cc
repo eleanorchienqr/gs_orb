@@ -5826,6 +5826,9 @@ void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
 
     // 1.1 Image data [input]
     cv::Mat pTrainedImage = pKF->mImRGB;
+    // Debug blurred image
+    // cv::Mat pTrainedImage;
+    // cv::GaussianBlur(pTrainedImage_, pTrainedImage, cv::Size(127,127), 0);
 
     // 1.2 Camera data [input]
     int pImHeight, pImWidth;
