@@ -62,9 +62,9 @@ protected:
     torch::Tensor mOffsets;         // [mSizeofAnchors, mSizeofOffsets, 3]
 
     struct mFeatureMLP : torch::nn::Module { };             // [input_dim, output_dim] = [3+1, mFeatureDim]
-    struct mOpacityMLP : torch::nn::Module { };             // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofAnchors]
-    struct mCovarianceMLP : torch::nn::Module { };          // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofAnchors]
-    struct mColorMLP : torch::nn::Module { };               // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mFeatureDim]
+    struct mOpacityMLP : torch::nn::Module { };             // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
+    struct mCovarianceMLP : torch::nn::Module { };          // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
+    struct mColorMLP : torch::nn::Module { };               // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
     struct mAppearanceEmbedding : torch::nn::Module { };    // [input_dim, output_dim] = [mSizeofCameras, mAppearanceDim]
 
     // 3. Anchor mangement members
@@ -84,9 +84,6 @@ protected:
     torch::Tensor mNerfNormTranslation;
 
     // 5. Render params
-    int mMaxSHDegree = 0;
-    int mActiveSHDegree = 0;
-
     bool mWhiteBackground = true;
     torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);
     

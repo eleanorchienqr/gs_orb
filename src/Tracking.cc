@@ -2927,6 +2927,7 @@ void Tracking::CreateInitialMapMonocular()
     #ifdef GAUSSIANSPLATTING
     // Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
     // Optimizer::GlobalGaussianOptimizationMonoGS(pKFini);
+    Optimizer::GlobalAchorInitOptimization(mpAtlas->GetCurrentMap()); // Anchor optimization test func
 
     Optimizer::GlobalGaussianOptimizationInitFrame(pKFini); // latest version
     // Optimizer::GlobalGaussianOptimization(pKFini);

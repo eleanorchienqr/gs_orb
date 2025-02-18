@@ -5963,4 +5963,25 @@ void Optimizer::GlobalGaussianOptimizationInitFrame(KeyFrame* pKF)
         }
     }
 }
+
+void Optimizer::GlobalAchorInitOptimization(Map* pMap)
+{
+    vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
+    vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
+
+    // Get Init Acnhor Num
+    int SizeofInitAnchors = 0;
+    for(int i = 0; i < vpMP.size(); i++){
+        MapPoint* pMP = vpMP[i];
+        if(pMP)
+            SizeofInitAnchors += pMP->GetGaussianNum();
+    }
+    std::cout << ">>>>>>>[GlobalAchorInitOptimization] The numbers of Init Anchors: " << SizeofInitAnchors << std::endl;
+
+
+    // Initialization Info
+    torch::Tensor AnchorWorldPos;   // [SizeofInitAnchors, 3]
+
+}
+
 } //namespace ORB_SLAM

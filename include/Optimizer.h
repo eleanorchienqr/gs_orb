@@ -110,6 +110,9 @@ public:
     // Gaussian Optimization Fine Tune
     void static GlobalGaussianOptimizationMonoGS(KeyFrame* pKF);
 
+    // Anchor Optimization
+    void static GlobalAchorInitOptimization(Map* pMap);
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
 protected:
