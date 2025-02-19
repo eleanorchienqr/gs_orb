@@ -57,8 +57,9 @@ protected:
 
     // 2. Learnable members
     torch::Tensor mAchorPos;        // [mSizeofAnchors, 3]
-    torch::Tensor mAchorFeatures;   // [mSizeofAnchors, 3]
+    torch::Tensor mAchorFeatures;   // [mSizeofAnchors, 32]
     torch::Tensor mAchorScales;     // [mSizeofAnchors, 1]
+    torch::Tensor mAchorRotations;     // [mSizeofAnchors, 1]
     torch::Tensor mOffsets;         // [mSizeofAnchors, mSizeofOffsets, 3]
 
     struct mFeatureMLP : torch::nn::Module { };             // [input_dim, output_dim] = [3+1, mFeatureDim]

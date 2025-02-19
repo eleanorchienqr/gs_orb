@@ -5969,7 +5969,7 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
 
-    // Get Init Acnhor Num
+    // 1. Get Init Acnhor Num
     int SizeofInitAnchors = 0;
     for(int i = 0; i < vpMP.size(); i++){
         MapPoint* pMP = vpMP[i];
@@ -5979,8 +5979,41 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     std::cout << ">>>>>>>[GlobalAchorInitOptimization] The numbers of Init Anchors: " << SizeofInitAnchors << std::endl;
 
 
-    // Initialization Info
-    torch::Tensor AnchorWorldPos;   // [SizeofInitAnchors, 3]
+    // 2. Initialization Info
+
+    // 2.1 MapPoint associated members
+    int AnchorFeatureDim = 32;
+    int AnchorSizeofOffsets = 5;
+    torch::Tensor AnchorWorldPos  = torch::zeros({SizeofInitAnchors, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                      // [SizeofInitAnchors, 3]
+    torch::Tensor AnchorFeatures  = torch::zeros({SizeofInitAnchors, AnchorFeatureDim}, torch::dtype(torch::kFloat)).to(torch::kCUDA);       // [SizeofInitAnchors, AnchorFeatureDim]
+    torch::Tensor AnchorScales  = torch::zeros({SizeofInitAnchors, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                        // [SizeofInitAnchors, 1]
+    torch::Tensor AnchorRotations  = torch::zeros({SizeofInitAnchors, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                     // [SizeofInitAnchors, 4]
+    torch::Tensor AnchorOffsets  = torch::zeros({SizeofInitAnchors, AnchorSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [SizeofInitAnchors, AnchorSizeofOffsets, 3]
+
+    // 2.2 Atlas associated MLP members
+    // Define a new Module.
+    struct Net : torch::nn::Module {
+        Net() {
+            // Construct and register two Linear submodules.
+            fc1 = register_module("fc1", torch::nn::Linear(784, 64));
+            fc2 = register_module("fc2", torch::nn::Linear(64, 32));
+            fc3 = register_module("fc3", torch::nn::Linear(32, 10));
+        }
+
+        // Implement the Net's algorithm.
+        torch::Tensor forward(torch::Tensor x) {
+            // Use one of many tensor manipulation functions.
+            x = torch::relu(fc1->forward(x.reshape({x.size(0), 784})));
+            x = torch::dropout(x, /*p=*/0.5, /*train=*/is_training());
+            x = torch::relu(fc2->forward(x));
+            x = torch::log_softmax(fc3->forward(x), /*dim=*/1);
+            return x;
+        }
+
+        // Use one of many "standard library" modules.
+        torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
+    };
+
 
 }
 
