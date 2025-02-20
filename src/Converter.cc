@@ -311,4 +311,34 @@ Sophus::Sim3f Converter::toSophus(const g2o::Sim3& S) {
                          S.translation().cast<float>());
 }
 
+torch::Tensor Converter::GetViewMatrix(Sophus::SE3f &Tcw)
+{
+    Sophus::SE3f Twc = Tcw.inverse();
+    Eigen::Matrix<float,3,3> Rwc = Twc.rotationMatrix();
+    Eigen::Matrix<float,3,1> twc = Twc.translation();
+
+    Eigen::Matrix4f W2C = Eigen::Matrix4f::Zero();
+    W2C.block<3, 3>(0, 0) = Rwc;
+    W2C.block<3, 1>(0, 3) = twc;
+    W2C(3, 3) = 1.0;
+    // Here we create a torch::Tensor from the Eigen::Matrix
+    // Note that the tensor will be on the CPU, you may want to move it to the desired device later
+    torch::Tensor W2CTensor = torch::from_blob(W2C.data(), {4, 4}, torch::kFloat);
+    // clone the tensor to allocate new memory, as from_blob shares the same memory
+    // this step is important if Rt will go out of scope and the tensor will be used later
+    return W2CTensor.clone().to(torch::kCUDA);
+}
+
+torch::Tensor Converter::CVMatToTensor(cv::Mat mat)
+{
+    cv::Mat matFloat;
+    mat.convertTo(matFloat, CV_32F, 1.f / 255.f);
+    
+    auto size = matFloat.size();
+    auto nChannels = matFloat.channels();
+    torch::Tensor tensor = torch::from_blob(matFloat.data, {size.height, size.width, nChannels}, torch::kFloat32);
+
+    return tensor.clamp(0.f, 1.f).permute({2, 0, 1}).clone();
+}
+
 } //namespace ORB_SLAM

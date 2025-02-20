@@ -90,6 +90,9 @@ public:
             const double C0 = 0.28209479177387814;
             return (rgb - 0.5f) / static_cast<float>(C0);
         }
+
+    static torch::Tensor GetViewMatrix(Sophus::SE3f &Tcw);
+    static torch::Tensor CVMatToTensor(cv::Mat mat);
 };
 
 }// namespace ORB_SLAM

@@ -5978,9 +5978,7 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     }
     std::cout << ">>>>>>>[GlobalAchorInitOptimization] The numbers of Init Anchors: " << SizeofInitAnchors << std::endl;
 
-
     // 2. Initialization Info
-
     // 2.1 MapPoint associated members
     int AnchorFeatureDim = 32;
     int AnchorSizeofOffsets = 5;
@@ -5990,29 +5988,128 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     torch::Tensor AnchorRotations  = torch::zeros({SizeofInitAnchors, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                     // [SizeofInitAnchors, 4]
     torch::Tensor AnchorOffsets  = torch::zeros({SizeofInitAnchors, AnchorSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [SizeofInitAnchors, AnchorSizeofOffsets, 3]
 
-    // 2.2 Atlas associated MLP members
-    // Define a new Module.
-    struct Net : torch::nn::Module {
-        Net() {
-            // Construct and register two Linear submodules.
-            fc1 = register_module("fc1", torch::nn::Linear(784, 64));
-            fc2 = register_module("fc2", torch::nn::Linear(64, 32));
-            fc3 = register_module("fc3", torch::nn::Linear(32, 10));
-        }
+    // 2.2 Atlas associated MLP members [referring to https://pytorch.org/tutorials/advanced/cpp_frontend.html]
+    // struct FeatureBankMLP : torch::nn::Module {
+    //     FeatureBankMLP(int FeatureDim)
+    //     : linear1(torch::nn::Linear(4, FeatureDim)),
+    //       linear2(torch::nn::Linear(FeatureDim, 3))
+    //     {
+    //         // register_module() is needed if we want to use the parameters() method later on
+    //         register_module("linear1", linear1);
+    //         register_module("linear2", linear2);
+    //     }
 
-        // Implement the Net's algorithm.
-        torch::Tensor forward(torch::Tensor x) {
-            // Use one of many tensor manipulation functions.
-            x = torch::relu(fc1->forward(x.reshape({x.size(0), 784})));
-            x = torch::dropout(x, /*p=*/0.5, /*train=*/is_training());
-            x = torch::relu(fc2->forward(x));
-            x = torch::log_softmax(fc3->forward(x), /*dim=*/1);
-            return x;
-        }
+    //     torch::Tensor forward(torch::Tensor x) 
+    //     {
+    //         x = torch::relu(linear1(x));
+    //         x = torch::softmax(linear2(x), 1);
+    //         return x;
+    //     }
 
-        // Use one of many "standard library" modules.
-        torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
-    };
+    //     torch::nn::Linear linear1, linear2;
+    // };
+
+    // struct OpacityMLP : torch::nn::Module {
+    //     OpacityMLP(int FeatureDim, int OffsetNum)
+    //     : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+    //       linear2(torch::nn::Linear(FeatureDim, OffsetNum))
+    //     {
+    //         // register_module() is needed if we want to use the parameters() method later on
+    //         register_module("linear1", linear1);
+    //         register_module("linear2", linear2);
+    //     }
+
+    //     torch::Tensor forward(torch::Tensor x) 
+    //     {
+    //         x = torch::relu(linear1(x));
+    //         x = torch::tanh(linear2(x));
+    //         return x;
+    //     }
+
+    //     torch::nn::Linear linear1, linear2;
+    // };
+
+    // struct CovarianceMLP : torch::nn::Module {
+    //     CovarianceMLP(int FeatureDim, int OffsetNum)
+    //     : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+    //       linear2(torch::nn::Linear(FeatureDim, 7 * OffsetNum))
+    //     {
+    //         // register_module() is needed if we want to use the parameters() method later on
+    //         register_module("linear1", linear1);
+    //         register_module("linear2", linear2);
+    //     }
+
+    //     torch::Tensor forward(torch::Tensor x) 
+    //     {
+    //         x = torch::relu(linear1(x));
+    //         x = linear2(x);
+    //         return x;
+    //     }
+
+    //     torch::nn::Linear linear1, linear2;
+    // };
+
+    // struct ColorMLP : torch::nn::Module {
+    //     ColorMLP(int FeatureDim, int OffsetNum)
+    //     : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+    //       linear2(torch::nn::Linear(FeatureDim, 3 * OffsetNum))
+    //     {
+    //         // register_module() is needed if we want to use the parameters() method later on
+    //         register_module("linear1", linear1);
+    //         register_module("linear2", linear2);
+    //     }
+
+    //     torch::Tensor forward(torch::Tensor x) 
+    //     {
+    //         x = torch::relu(linear1(x));
+    //         x = torch::sigmoid(linear2(x));
+    //         return x;
+    //     }
+
+    //     torch::nn::Linear linear1, linear2;
+    // };
+
+    ORB_SLAM3::FeatureBankMLP FBNet(AnchorFeatureDim);
+    ORB_SLAM3::OpacityMLP OpacityNet(AnchorFeatureDim, AnchorSizeofOffsets);
+    ORB_SLAM3::CovarianceMLP CovNet(AnchorFeatureDim, AnchorSizeofOffsets);
+    ORB_SLAM3::ColorMLP ColorNet(AnchorFeatureDim, AnchorSizeofOffsets);
+
+    FBNet.to(torch::kCUDA);
+    OpacityNet.to(torch::kCUDA);
+    CovNet.to(torch::kCUDA);
+    ColorNet.to(torch::kCUDA);
+
+    
+    for (const auto& p : ColorNet.parameters()) {
+        std::cout << p << std::endl;
+    }
+
+    // 3. Get Cam and Img from KFs [CamNum, intrinsics, extrinsics, imgs]
+    int CamNum = vpKFs.size();   
+    int ImHeight, ImWidth;
+    float TanFovx, TanFovy;
+    std::vector<torch::Tensor> ViewMatrices; //TODO mProjMatrices, mCameraCenters, mTrainedImagesTensor move to AnchorOptimization constructor
+    std::vector<cv::Mat> TrainedImages;
+
+    CamNum = vpKFs.size();   
+    vpKFs[0]->GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
+
+    //TODO move to Converter [GetViewMatrix, CVMatToTensor]
+
+    for(size_t i=0; i<vpKFs.size(); i++)
+    {
+        ORB_SLAM3::KeyFrame* pKF = vpKFs[i];
+        if(pKF->isBad())
+            continue;
+
+        Sophus::SE3f Tcw = pKF->GetPose();
+        torch::Tensor ViewMatrix = Converter::GetViewMatrix(Tcw);
+
+        TrainedImages.push_back(pKF->mImRGB);
+        ViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
+
+        std::cout << "[GlobalAchorInitOptimization] ViewMatrix: " << i << ", " << ViewMatrix << std::endl;
+    }
 
 
 }

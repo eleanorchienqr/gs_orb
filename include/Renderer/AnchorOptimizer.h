@@ -10,7 +10,12 @@ class AnchorOptimizer
 
 public:
     // Constructer
-    // AnchorOptimizer(const ORB_SLAM3::MonoGSOptimizationParameters &OptimParams, const std::vector<ORB_SLAM3::KeyFrame *> &vpKFs, const std::vector<ORB_SLAM3::MapPoint *> &vpMP);
+    // AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
+    //                 torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, 
+    //                 torch::Tensor AnchorRotations, torch::Tensor AnchorOffsets,
+    //                 ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::ColorMLP ColorNet,
+    //                 const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
+    //                 std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
 
     // Optimization body
     // void InitializeOptimization()
@@ -62,10 +67,10 @@ protected:
     torch::Tensor mAchorRotations;     // [mSizeofAnchors, 1]
     torch::Tensor mOffsets;         // [mSizeofAnchors, mSizeofOffsets, 3]
 
-    struct mFeatureMLP : torch::nn::Module { };             // [input_dim, output_dim] = [3+1, mFeatureDim]
-    struct mOpacityMLP : torch::nn::Module { };             // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
-    struct mCovarianceMLP : torch::nn::Module { };          // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
-    struct mColorMLP : torch::nn::Module { };               // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
+    ORB_SLAM3::FeatureBankMLP mFeatureMLP;              // [input_dim, output_dim] = [3+1, mFeatureDim]
+    ORB_SLAM3::OpacityMLP mOpacityMLP;                  // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
+    ORB_SLAM3::CovarianceMLP mCovarianceMLP;                           // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
+    ORB_SLAM3::ColorMLP mColorMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
     struct mAppearanceEmbedding : torch::nn::Module { };    // [input_dim, output_dim] = [mSizeofCameras, mAppearanceDim]
 
     // 3. Anchor mangement members
@@ -74,7 +79,8 @@ protected:
     torch::Tensor mOffsetDenom;             // [mSizeofAnchors*mSizeofOffsets, 1]
 
     // 4. Cameras associated members
-    int mSizeofCameras;
+    int mSizeofCameras, mImHeight, mImWidth;
+    float mTanFovx, mTanFovy;
     std::vector<cv::Mat> mTrainedImages;
     std::vector<torch::Tensor> mTrainedImagesTensor;
     std::vector<torch::Tensor> mViewMatrices;

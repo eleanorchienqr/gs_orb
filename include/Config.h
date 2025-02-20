@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string>
 
+#include <torch/torch.h>
+
 
 namespace ORB_SLAM3
 {
@@ -148,6 +150,95 @@ struct MonoGSOptimizationParameters
     // other
     bool empty_gpu_cache = false;
 };
+
+// MLP structures
+struct FeatureBankMLP : torch::nn::Module {
+    FeatureBankMLP(int FeatureDim)
+    : linear1(torch::nn::Linear(4, FeatureDim)),
+        linear2(torch::nn::Linear(FeatureDim, 3))
+    {
+        // register_module() is needed if we want to use the parameters() method later on
+        register_module("linear1", linear1);
+        register_module("linear2", linear2);
+    }
+
+    torch::Tensor forward(torch::Tensor x) 
+    {
+        x = torch::relu(linear1(x));
+        x = torch::softmax(linear2(x), 1);
+        return x;
+    }
+
+    torch::nn::Linear linear1, linear2;
+};
+
+struct OpacityMLP : torch::nn::Module {
+    OpacityMLP(int FeatureDim, int OffsetNum)
+    : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+        linear2(torch::nn::Linear(FeatureDim, OffsetNum))
+    {
+        // register_module() is needed if we want to use the parameters() method later on
+        register_module("linear1", linear1);
+        register_module("linear2", linear2);
+    }
+
+    torch::Tensor forward(torch::Tensor x) 
+    {
+        x = torch::relu(linear1(x));
+        x = torch::tanh(linear2(x));
+        return x;
+    }
+
+    torch::nn::Linear linear1, linear2;
+};
+
+struct CovarianceMLP : torch::nn::Module {
+    CovarianceMLP(int FeatureDim, int OffsetNum)
+    : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+        linear2(torch::nn::Linear(FeatureDim, 7 * OffsetNum))
+    {
+        // register_module() is needed if we want to use the parameters() method later on
+        register_module("linear1", linear1);
+        register_module("linear2", linear2);
+    }
+
+    torch::Tensor forward(torch::Tensor x) 
+    {
+        x = torch::relu(linear1(x));
+        x = linear2(x);
+        return x;
+    }
+
+    torch::nn::Linear linear1, linear2;
+};
+
+struct ColorMLP : torch::nn::Module {
+    ColorMLP(int FeatureDim, int OffsetNum)
+    : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+        linear2(torch::nn::Linear(FeatureDim, 3 * OffsetNum))
+    {
+        // register_module() is needed if we want to use the parameters() method later on
+        register_module("linear1", linear1);
+        register_module("linear2", linear2);
+    }
+
+    torch::Tensor forward(torch::Tensor x) 
+    {
+        x = torch::relu(linear1(x));
+        x = torch::sigmoid(linear2(x));
+        return x;
+    }
+
+    torch::nn::Linear linear1, linear2;
+};
+
+// torch::nn::Sequential version
+// torch::nn::Sequential seq(
+//     torch::nn::Linear(3, 4),
+//     torch::nn::BatchNorm1d(4),
+//     torch::nn::Dropout(0.5)
+// );
+// seq->to(torch::kCUDA);
 
 }
 
