@@ -10,16 +10,15 @@ class AnchorOptimizer
 
 public:
     // Constructer
-    // AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
-    //                 torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, 
-    //                 torch::Tensor AnchorRotations, torch::Tensor AnchorOffsets,
-    //                 ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::ColorMLP ColorNet,
-    //                 const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
-    //                 std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
+    AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
+                    torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, 
+                    torch::Tensor AnchorRotations, torch::Tensor AnchorOffsets,
+                    ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::ColorMLP ColorNet,
+                    const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
+                    std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
 
     // Optimization body
-    // void InitializeOptimization()
-    // void TrainingSetup();
+    void TrainingSetup();
     // void Optimize();
 
     // Densification and prune
@@ -101,6 +100,11 @@ protected:
     float mFar = 100.0f;
 
     // 6. Traning and loss members
+    std::unique_ptr<torch::optim::Adam> mAttributesOptimizer;
+    std::unique_ptr<torch::optim::Adam> mFeatureBankMLPOptimizer;
+    std::unique_ptr<torch::optim::Adam> mOpacityMLPOptimizer;
+    std::unique_ptr<torch::optim::Adam> mCovarianceMLPOptimizer;
+    std::unique_ptr<torch::optim::Adam> mColorMLPOptimizer;
 
 
     // 7. MapPoint label management

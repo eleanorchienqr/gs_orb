@@ -42,6 +42,7 @@
 
 #include "OptimizableTypes.h"
 #include "GaussianOptimizer.h"
+#include "AnchorOptimizer.h"
 
 // using namespace GaussianSplatting;
 
@@ -5989,86 +5990,6 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     torch::Tensor AnchorOffsets  = torch::zeros({SizeofInitAnchors, AnchorSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [SizeofInitAnchors, AnchorSizeofOffsets, 3]
 
     // 2.2 Atlas associated MLP members [referring to https://pytorch.org/tutorials/advanced/cpp_frontend.html]
-    // struct FeatureBankMLP : torch::nn::Module {
-    //     FeatureBankMLP(int FeatureDim)
-    //     : linear1(torch::nn::Linear(4, FeatureDim)),
-    //       linear2(torch::nn::Linear(FeatureDim, 3))
-    //     {
-    //         // register_module() is needed if we want to use the parameters() method later on
-    //         register_module("linear1", linear1);
-    //         register_module("linear2", linear2);
-    //     }
-
-    //     torch::Tensor forward(torch::Tensor x) 
-    //     {
-    //         x = torch::relu(linear1(x));
-    //         x = torch::softmax(linear2(x), 1);
-    //         return x;
-    //     }
-
-    //     torch::nn::Linear linear1, linear2;
-    // };
-
-    // struct OpacityMLP : torch::nn::Module {
-    //     OpacityMLP(int FeatureDim, int OffsetNum)
-    //     : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
-    //       linear2(torch::nn::Linear(FeatureDim, OffsetNum))
-    //     {
-    //         // register_module() is needed if we want to use the parameters() method later on
-    //         register_module("linear1", linear1);
-    //         register_module("linear2", linear2);
-    //     }
-
-    //     torch::Tensor forward(torch::Tensor x) 
-    //     {
-    //         x = torch::relu(linear1(x));
-    //         x = torch::tanh(linear2(x));
-    //         return x;
-    //     }
-
-    //     torch::nn::Linear linear1, linear2;
-    // };
-
-    // struct CovarianceMLP : torch::nn::Module {
-    //     CovarianceMLP(int FeatureDim, int OffsetNum)
-    //     : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
-    //       linear2(torch::nn::Linear(FeatureDim, 7 * OffsetNum))
-    //     {
-    //         // register_module() is needed if we want to use the parameters() method later on
-    //         register_module("linear1", linear1);
-    //         register_module("linear2", linear2);
-    //     }
-
-    //     torch::Tensor forward(torch::Tensor x) 
-    //     {
-    //         x = torch::relu(linear1(x));
-    //         x = linear2(x);
-    //         return x;
-    //     }
-
-    //     torch::nn::Linear linear1, linear2;
-    // };
-
-    // struct ColorMLP : torch::nn::Module {
-    //     ColorMLP(int FeatureDim, int OffsetNum)
-    //     : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
-    //       linear2(torch::nn::Linear(FeatureDim, 3 * OffsetNum))
-    //     {
-    //         // register_module() is needed if we want to use the parameters() method later on
-    //         register_module("linear1", linear1);
-    //         register_module("linear2", linear2);
-    //     }
-
-    //     torch::Tensor forward(torch::Tensor x) 
-    //     {
-    //         x = torch::relu(linear1(x));
-    //         x = torch::sigmoid(linear2(x));
-    //         return x;
-    //     }
-
-    //     torch::nn::Linear linear1, linear2;
-    // };
-
     ORB_SLAM3::FeatureBankMLP FBNet(AnchorFeatureDim);
     ORB_SLAM3::OpacityMLP OpacityNet(AnchorFeatureDim, AnchorSizeofOffsets);
     ORB_SLAM3::CovarianceMLP CovNet(AnchorFeatureDim, AnchorSizeofOffsets);
@@ -6079,22 +6000,19 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     CovNet.to(torch::kCUDA);
     ColorNet.to(torch::kCUDA);
 
-    
-    for (const auto& p : ColorNet.parameters()) {
-        std::cout << p << std::endl;
-    }
+    // for (const auto& p : ColorNet.parameters()) {
+    //     std::cout << p << std::endl;
+    // }
 
     // 3. Get Cam and Img from KFs [CamNum, intrinsics, extrinsics, imgs]
     int CamNum = vpKFs.size();   
     int ImHeight, ImWidth;
     float TanFovx, TanFovy;
-    std::vector<torch::Tensor> ViewMatrices; //TODO mProjMatrices, mCameraCenters, mTrainedImagesTensor move to AnchorOptimization constructor
+    std::vector<torch::Tensor> ViewMatrices; 
     std::vector<cv::Mat> TrainedImages;
 
     CamNum = vpKFs.size();   
     vpKFs[0]->GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
-
-    //TODO move to Converter [GetViewMatrix, CVMatToTensor]
 
     for(size_t i=0; i<vpKFs.size(); i++)
     {
@@ -6107,10 +6025,17 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
 
         TrainedImages.push_back(pKF->mImRGB);
         ViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
-
-        std::cout << "[GlobalAchorInitOptimization] ViewMatrix: " << i << ", " << ViewMatrix << std::endl;
     }
 
+    // 4. Optimization
+    GaussianSplatting::AnchorOptimizer optimizer(SizeofInitAnchors, AnchorFeatureDim, AnchorSizeofOffsets, CamNum, 
+                                                AnchorWorldPos, AnchorFeatures, AnchorScales, AnchorRotations, AnchorOffsets,
+                                                FBNet, OpacityNet, CovNet, ColorNet,
+                                                ImHeight, ImWidth, TanFovx, TanFovy, ViewMatrices, TrainedImages);
+    optimizer.TrainingSetup();
+    // optimizer.Optimize();
+
+    // 5. Postprocessing
 
 }
 
