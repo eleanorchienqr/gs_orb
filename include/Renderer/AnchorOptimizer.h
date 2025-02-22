@@ -35,10 +35,7 @@ public:
     // void ResetOpacity();
     
     // Learning rate updater
-    // void UpdateLR(float iteration);
-
-    // SH degree updater
-    // void UpdateSHDegree();
+    void UpdateLR(float iteration);
 
     // Utils
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
@@ -50,7 +47,12 @@ public:
 
 protected:
     // 1. Setting
-    ORB_SLAM3::OptimizationParameters mOptimParams;
+    ORB_SLAM3::ScaffoldOptimizationParams mOptimizationParams;
+
+    struct mModelParams
+    {
+
+    };
 
     int mSizeofAnchors;
     int mSizeofOffsets = 5;
@@ -60,22 +62,23 @@ protected:
     float mVoxelSize = 0.01;
 
     // 2. Learnable members
-    torch::Tensor mAchorPos;        // [mSizeofAnchors, 3]
-    torch::Tensor mAchorFeatures;   // [mSizeofAnchors, 32]
-    torch::Tensor mAchorScales;     // [mSizeofAnchors, 1]
-    torch::Tensor mAchorRotations;     // [mSizeofAnchors, 1]
-    torch::Tensor mOffsets;         // [mSizeofAnchors, mSizeofOffsets, 3]
+    torch::Tensor mAchorPos;            // [mSizeofAnchors, 3]
+    torch::Tensor mAchorFeatures;       // [mSizeofAnchors, 32]
+    torch::Tensor mAchorScales;         // [mSizeofAnchors, 1]
+    torch::Tensor mAchorRotations;      // [mSizeofAnchors, 1]
+    torch::Tensor mOffsets;             // [mSizeofAnchors, mSizeofOffsets, 3]
 
-    ORB_SLAM3::FeatureBankMLP mFeatureMLP;              // [input_dim, output_dim] = [3+1, mFeatureDim]
-    ORB_SLAM3::OpacityMLP mOpacityMLP;                  // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
-    ORB_SLAM3::CovarianceMLP mCovarianceMLP;                           // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
-    ORB_SLAM3::ColorMLP mColorMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
+    ORB_SLAM3::FeatureBankMLP mFeatureMLP;                  // [input_dim, output_dim] = [3+1, mFeatureDim]
+    ORB_SLAM3::OpacityMLP mOpacityMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
+    ORB_SLAM3::CovarianceMLP mCovarianceMLP;                // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
+    ORB_SLAM3::ColorMLP mColorMLP;                          // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
     struct mAppearanceEmbedding : torch::nn::Module { };    // [input_dim, output_dim] = [mSizeofCameras, mAppearanceDim]
 
     // 3. Anchor mangement members
     torch::Tensor mOpacityAccum;            // [mSizeofAnchors, 1]
     torch::Tensor mOffsetGradientAccum;     // [mSizeofAnchors*mSizeofOffsets, 1]
     torch::Tensor mOffsetDenom;             // [mSizeofAnchors*mSizeofOffsets, 1]
+    torch::Tensor mAnchorDenom;             // [mSizeofAnchors, 1]
 
     // 4. Cameras associated members
     int mSizeofCameras, mImHeight, mImWidth;
@@ -100,12 +103,19 @@ protected:
     float mFar = 100.0f;
 
     // 6. Traning and loss members
-    std::unique_ptr<torch::optim::Adam> mAttributesOptimizer;
-    std::unique_ptr<torch::optim::Adam> mFeatureBankMLPOptimizer;
-    std::unique_ptr<torch::optim::Adam> mOpacityMLPOptimizer;
-    std::unique_ptr<torch::optim::Adam> mCovarianceMLPOptimizer;
-    std::unique_ptr<torch::optim::Adam> mColorMLPOptimizer;
+    std::unique_ptr<torch::optim::Adam> mOptimizer;
+    // std::unique_ptr<torch::optim::Adam> mAttributesOptimizer;
+    // std::unique_ptr<torch::optim::Adam> mFeatureBankMLPOptimizer;
+    // std::unique_ptr<torch::optim::Adam> mOpacityMLPOptimizer;
+    // std::unique_ptr<torch::optim::Adam> mCovarianceMLPOptimizer;
+    // std::unique_ptr<torch::optim::Adam> mColorMLPOptimizer;
 
+    ORB_SLAM3::ExponLRFunc mAnchorSchedulerArgs;
+    ORB_SLAM3::ExponLRFunc mOffsetSchedulerArgs;
+    ORB_SLAM3::ExponLRFunc mFeatureBankMLPSchedulerArgs;
+    ORB_SLAM3::ExponLRFunc mOpacityMLPSchedulerArgs;
+    ORB_SLAM3::ExponLRFunc mCovarianceMLPSchedulerArgs;
+    ORB_SLAM3::ExponLRFunc mColorMLPSchedulerArgs;
 
     // 7. MapPoint label management
     std::vector<long> mvpAnchorRootIndex;  
