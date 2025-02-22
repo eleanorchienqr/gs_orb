@@ -17,15 +17,34 @@ AnchorOptimizer::AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureD
                 mImHeight(ImHeight), mImWidth(ImWidth), mTanFovx(TanFovx), mTanFovy(TanFovy), 
                 mViewMatrices(ViewMatrices), mTrainedImages(TrainedImages)
                 {
-                    std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer] constructor" << std::endl;
                     //TODO mProjMatrices, mCameraCenters, mTrainedImagesTensor move to AnchorOptimization constructor
+                    SetProjMatrix();
+                    
+                    mProjMatrices.reserve(CamNum);
+                    mCameraCenters.reserve(CamNum);
+                    mTrainedImagesTensor.reserve(CamNum);
+
+                    for(size_t i=0; i < CamNum; i++)
+                    {
+                        torch::Tensor ViewMatrix = mViewMatrices[i];
+                        torch::Tensor FullProjMatrix = ViewMatrix.unsqueeze(0).bmm(mProjMatrix.unsqueeze(0)).squeeze(0);
+                        torch::Tensor CamCenter = ViewMatrix.inverse()[3].slice(0, 0, 3);
+
+                        torch::Tensor TrainedImageTensor = ORB_SLAM3::Converter::CVMatToTensor(mTrainedImages[i]);
+
+                        mProjMatrices.push_back(FullProjMatrix.to(torch::kCUDA));
+                        mCameraCenters.push_back(CamCenter.to(torch::kCUDA));
+                        mTrainedImagesTensor.push_back(TrainedImageTensor.to(torch::kCUDA));    // 1.0 / 225.
+
+                        std::cout << "[>>>AnchorOptimization] ViewMatrix: " << i << ", " << mViewMatrices[i] << std::endl;
+                        std::cout << "[>>>AnchorOptimization] ProjMatrix: " << i << ", " << mProjMatrices[i] << std::endl;
+                    }
 
                     // Anchor Management Members initialization
                     mOpacityAccum = torch::zeros({mSizeofAnchors, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                             // [mSizeofAnchors, 1]
                     mOffsetGradientAccum = torch::zeros({mSizeofAnchors * mSizeofOffsets, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);     // [mSizeofAnchors*mSizeofOffsets, 1]
                     mOffsetDenom = torch::zeros({mSizeofAnchors * mSizeofOffsets, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);             // [mSizeofAnchors*mSizeofOffsets, 1]
                     mAnchorDenom = torch::zeros({mSizeofAnchors, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                              // [mSizeofAnchors, 1]
-
                 }
 
 void AnchorOptimizer::TrainingSetup()
@@ -92,6 +111,27 @@ void AnchorOptimizer::TrainingSetup()
     mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));  
 }
 
+void AnchorOptimizer::Optimize()
+{
+    std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer] Optimize " << std::endl;
+
+    for (int iter = 1; iter < mOptimizationParams.Iter + 1; ++iter) 
+    {
+        // Filter anchors in the Frustum
+
+        // Neural Gaussian derivation
+
+        // Rasterization
+
+        // Loss and backward
+
+        // Anchor management
+
+    }
+
+
+}
+
 void AnchorOptimizer::UpdateLR(float iteration)
 {
     // TODO Learning rate update check 
@@ -100,7 +140,7 @@ void AnchorOptimizer::UpdateLR(float iteration)
 
     float AchorPosLR = mAnchorSchedulerArgs(iteration);
     float OffsetLR = mOffsetSchedulerArgs(iteration);
-    
+
     float FeatureBankMLPLR = mFeatureBankMLPSchedulerArgs(iteration);
     float OpacityMLPLR = mOpacityMLPSchedulerArgs(iteration);
     float CovarianceMLPLR = mCovarianceMLPSchedulerArgs(iteration);
@@ -114,5 +154,30 @@ void AnchorOptimizer::UpdateLR(float iteration)
     static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[7].options()).set_lr(CovarianceMLPLR);
     static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[8].options()).set_lr(ColorMLPLR);
 }
+
+// Utils func
+void AnchorOptimizer::SetProjMatrix()
+{
+    float top = mTanFovy * mNear;
+    float bottom = -top;
+    float right = mTanFovx * mNear;
+    float left = -right;
+
+    Eigen::Matrix4f P = Eigen::Matrix4f::Zero();
+
+    float z_sign = 1.f;
+
+    P(0, 0) = 2.f * mNear / (right - left);
+    P(1, 1) = 2.f * mNear / (top - bottom);
+    P(0, 2) = (right + left) / (right - left);
+    P(1, 2) = (top + bottom) / (top - bottom);
+    P(3, 2) = z_sign;
+    P(2, 2) = z_sign * mFar / (mFar - mNear);
+    P(2, 3) = -(mFar * mNear) / (mFar - mNear);
+
+    // create torch::Tensor from Eigen::Matrix
+    mProjMatrix = torch::from_blob(P.data(), {4, 4}, torch::kFloat).to(torch::kCUDA);
+}
+
 
 }

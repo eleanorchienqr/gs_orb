@@ -5980,7 +5980,7 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     std::cout << ">>>>>>>[GlobalAchorInitOptimization] The numbers of Init Anchors: " << SizeofInitAnchors << std::endl;
 
     // 2. Initialization Info
-    // 2.1 MapPoint associated members
+    // 2.1 MapPoint associated members .index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
     int AnchorFeatureDim = 32;
     int AnchorSizeofOffsets = 5;
     torch::Tensor AnchorWorldPos  = torch::zeros({SizeofInitAnchors, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                      // [SizeofInitAnchors, 3]
@@ -5989,6 +5989,27 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     torch::Tensor AnchorRotations  = torch::zeros({SizeofInitAnchors, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                     // [SizeofInitAnchors, 4]
     torch::Tensor AnchorOffsets  = torch::zeros({SizeofInitAnchors, AnchorSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [SizeofInitAnchors, AnchorSizeofOffsets, 3]
 
+    {
+        torch::NoGradGuard no_grad;
+        int GaussianClusterIndex = 0;
+        for(int i = 0; i < vpMP.size(); i++){
+            MapPoint* pMP = vpMP[i];
+            if(pMP)
+                if(!pMP->isBad() && pMP->GetGaussianNum())
+                {
+                    int GaussianClusterNum = pMP->GetGaussianNum();
+                    AnchorWorldPos.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+                    GaussianClusterIndex += GaussianClusterNum;
+                    // std::cout << "[GlobalGaussianOptimizationInitFrame] Init vpGaussianRootIndex: " << i << std::endl;
+                    
+                }
+        }
+
+        torch::Tensor dist2 = torch::clamp_min(distCUDA2(AnchorWorldPos), 0.0000001);
+        AnchorScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
+        AnchorRotations.index_put_({torch::indexing::Slice(), 0}, 1);
+    }
+    
     // 2.2 Atlas associated MLP members [referring to https://pytorch.org/tutorials/advanced/cpp_frontend.html]
     ORB_SLAM3::FeatureBankMLP FBNet(AnchorFeatureDim);
     ORB_SLAM3::OpacityMLP OpacityNet(AnchorFeatureDim, AnchorSizeofOffsets);
@@ -5999,10 +6020,6 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     OpacityNet.to(torch::kCUDA);
     CovNet.to(torch::kCUDA);
     ColorNet.to(torch::kCUDA);
-
-    // for (const auto& p : ColorNet.parameters()) {
-    //     std::cout << p << std::endl;
-    // }
 
     // 3. Get Cam and Img from KFs [CamNum, intrinsics, extrinsics, imgs]
     int CamNum = vpKFs.size();   
@@ -6033,7 +6050,7 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
                                                 FBNet, OpacityNet, CovNet, ColorNet,
                                                 ImHeight, ImWidth, TanFovx, TanFovy, ViewMatrices, TrainedImages);
     optimizer.TrainingSetup();
-    // optimizer.Optimize();
+    optimizer.Optimize();
 
     // 5. Postprocessing
 

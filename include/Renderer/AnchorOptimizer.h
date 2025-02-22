@@ -1,6 +1,7 @@
 #include <torch/torch.h>
 
 #include "Config.h"
+#include "Converter.h"
 #include "KeyFrame.h"
 
 namespace GaussianSplatting{
@@ -16,10 +17,12 @@ public:
                     ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::ColorMLP ColorNet,
                     const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
                     std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
-
-    // Optimization body
     void TrainingSetup();
-    // void Optimize();
+    void Optimize();
+
+protected:
+    // Setters
+    void SetProjMatrix();
 
     // Densification and prune
     // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
@@ -83,6 +86,7 @@ protected:
     // 4. Cameras associated members
     int mSizeofCameras, mImHeight, mImWidth;
     float mTanFovx, mTanFovy;
+    torch::Tensor mProjMatrix;
     std::vector<cv::Mat> mTrainedImages;
     std::vector<torch::Tensor> mTrainedImagesTensor;
     std::vector<torch::Tensor> mViewMatrices;
@@ -93,15 +97,15 @@ protected:
     torch::Tensor mNerfNormTranslation;
 
     // 5. Render params
-    bool mWhiteBackground = true;
-    torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);
-    
-    float mScaleModifier = 1.f;
-    bool mPrefiltered = false;
-
     float mNear = 0.01f;
     float mFar = 100.0f;
 
+    float mScaleModifier = 1.f;
+    bool mPrefiltered = false;
+
+    bool mWhiteBackground = true;
+    torch::Tensor mBackground = torch::tensor({1.f, 1.f, 1.f}).to(torch::kCUDA);
+    
     // 6. Traning and loss members
     std::unique_ptr<torch::optim::Adam> mOptimizer;
     // std::unique_ptr<torch::optim::Adam> mAttributesOptimizer;
@@ -119,6 +123,9 @@ protected:
 
     // 7. MapPoint label management
     std::vector<long> mvpAnchorRootIndex;  
+
+    // Voxel size management
+    // torch::Tensor mVoxelSizes;
 };
 
 }
