@@ -21,6 +21,7 @@ struct GaussianRasterizationSettings {
     int sh_degree;
     torch::Tensor camera_center;
     bool prefiltered;
+    // bool debug = false;
 };
 
 torch::autograd::tensor_list rasterize_gaussians(torch::Tensor means3D,
@@ -235,6 +236,46 @@ public:
             raster_settings_.projmatrix);
 
         return visible;
+    }
+
+    torch::Tensor visible_filter(torch::Tensor means3D,
+                                 torch::Tensor scales,
+                                 torch::Tensor rotations,
+                                 torch::Tensor cov3D_precomp = torch::Tensor())
+    {
+        torch::NoGradGuard no_grad;
+
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] means3D [ " << means3D.size(0)  << ", " << means3D.size(1) << " ]" << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] scales [ " << scales.size(0) << ", " << scales.size(1) << " ]" << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] rotations [ " << rotations.size(0) << ", " << rotations.size(1) << " ]" << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] cov3D_precomp " << cov3D_precomp << std::endl;
+        
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] scale_modifier " << raster_settings_.scale_modifier << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] viewmatrix " << raster_settings_.viewmatrix << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] projmatrix " << raster_settings_.projmatrix << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] tanfovx " << raster_settings_.tanfovx << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] tanfovy " << raster_settings_.tanfovy << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] image_height " << raster_settings_.image_height << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] image_width " << raster_settings_.image_width << std::endl;
+        // std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer->PrefilterVoxel] prefiltered " << raster_settings_.prefiltered << std::endl;
+
+        // Invoke C++/CUDA rasterization routine
+        torch::Tensor radii = RasterizeGaussiansfilterCUDA(
+            means3D,
+            scales,
+            rotations,
+            raster_settings_.scale_modifier,
+            cov3D_precomp,
+            raster_settings_.viewmatrix,
+            raster_settings_.projmatrix,
+            raster_settings_.tanfovx,
+            raster_settings_.tanfovy,
+            raster_settings_.image_height,
+            raster_settings_.image_width,
+            raster_settings_.prefiltered,
+            false);
+
+        return  radii;
     }
 
     std::tuple<torch::Tensor, torch::Tensor> forward(torch::Tensor means3D,

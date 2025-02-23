@@ -24,6 +24,9 @@ protected:
     // Setters
     void SetProjMatrix();
 
+    // Filters
+    void PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelMask);
+
     // Densification and prune
     // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
     // void DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size);
@@ -38,7 +41,7 @@ protected:
     // void ResetOpacity();
     
     // Learning rate updater
-    void UpdateLR(float iteration);
+    void UpdateLR(const float iteration);
 
     // Utils
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
@@ -67,7 +70,7 @@ protected:
     // 2. Learnable members
     torch::Tensor mAchorPos;            // [mSizeofAnchors, 3]
     torch::Tensor mAchorFeatures;       // [mSizeofAnchors, 32]
-    torch::Tensor mAchorScales;         // [mSizeofAnchors, 1]
+    torch::Tensor mAchorScales;         // [mSizeofAnchors, 3]
     torch::Tensor mAchorRotations;      // [mSizeofAnchors, 1]
     torch::Tensor mOffsets;             // [mSizeofAnchors, mSizeofOffsets, 3]
 

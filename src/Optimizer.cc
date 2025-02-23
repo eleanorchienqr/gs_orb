@@ -5985,7 +5985,7 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     int AnchorSizeofOffsets = 5;
     torch::Tensor AnchorWorldPos  = torch::zeros({SizeofInitAnchors, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                      // [SizeofInitAnchors, 3]
     torch::Tensor AnchorFeatures  = torch::zeros({SizeofInitAnchors, AnchorFeatureDim}, torch::dtype(torch::kFloat)).to(torch::kCUDA);       // [SizeofInitAnchors, AnchorFeatureDim]
-    torch::Tensor AnchorScales  = torch::zeros({SizeofInitAnchors, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                        // [SizeofInitAnchors, 1]
+    torch::Tensor AnchorScales  = torch::zeros({SizeofInitAnchors, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                        // [SizeofInitAnchors, 1]
     torch::Tensor AnchorRotations  = torch::zeros({SizeofInitAnchors, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                     // [SizeofInitAnchors, 4]
     torch::Tensor AnchorOffsets  = torch::zeros({SizeofInitAnchors, AnchorSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [SizeofInitAnchors, AnchorSizeofOffsets, 3]
 

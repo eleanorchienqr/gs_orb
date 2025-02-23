@@ -113,11 +113,21 @@ void AnchorOptimizer::TrainingSetup()
 
 void AnchorOptimizer::Optimize()
 {
-    std::cout << "[GlobalAchorInitOptimization->AnchorOptimizer] Optimize " << std::endl;
+    // Version 1: use ini KeyFrame as 
+    torch::Tensor ViewMatrix = mViewMatrices[0];
+    torch::Tensor ProjMatrix = mProjMatrices[0];
+    torch::Tensor CamCenter = mCameraCenters[0];
+    torch::Tensor GTImg = mTrainedImagesTensor[0];
+
+    // Important variables
+    torch::Tensor VisibleVoxelMask = torch::Tensor();
 
     for (int iter = 1; iter < mOptimizationParams.Iter + 1; ++iter) 
     {
+        
+
         // Filter anchors in the Frustum
+        PrefilterVoxel(ViewMatrix, ProjMatrix, CamCenter, VisibleVoxelMask);
 
         // Neural Gaussian derivation
 
@@ -132,7 +142,39 @@ void AnchorOptimizer::Optimize()
 
 }
 
-void AnchorOptimizer::UpdateLR(float iteration)
+// Filters
+void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelMask)
+{
+
+    // Note: no gradient
+    // Important variables
+    torch::Tensor Cov3DPrecomp = torch::Tensor();
+    
+    // Set up rasterization configuration
+    GaussianRasterizationSettings raster_settings = {
+        .image_height = static_cast<int>(mImHeight),
+        .image_width = static_cast<int>(mImWidth),
+        .tanfovx = mTanFovx,
+        .tanfovy = mTanFovy,
+        .bg = mBackground,
+        .scale_modifier = mScaleModifier,
+        .viewmatrix = ViewMatrix,
+        .projmatrix = ProjMatrix,
+        .sh_degree = 1,
+        .camera_center = CamCenter,
+        .prefiltered = false};
+    
+    GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+    torch::cuda::synchronize();
+
+    // torch::Tensor radii = rasterizer.visible_filter(
+    //     mAchorPos, 
+    //     torch::exp(mAchorScales).to(torch::kCUDA), 
+    //     torch::nn::functional::normalize(mAchorRotations).to(torch::kCUDA),
+    //     Cov3DPrecomp);
+}
+
+void AnchorOptimizer::UpdateLR(const float iteration)
 {
     // TODO Learning rate update check 
     // This is hacky because you cant change in libtorch individual parameter learning rate

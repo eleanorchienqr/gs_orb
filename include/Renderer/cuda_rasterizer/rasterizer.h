@@ -79,6 +79,25 @@ namespace CudaRasterizer {
             float* dL_dscale,
             float* dL_drot,
             bool debug);
+        
+        // Scaffold-GS
+        static void visible_filter(
+                std::function<char* (size_t)> geometryBuffer,
+                std::function<char* (size_t)> binningBuffer,
+                std::function<char* (size_t)> imageBuffer,
+                const int P, int M,
+                const int width, int height,
+                const float* means3D,
+                const float* scales,
+                const float scale_modifier,
+                const float* rotations,
+                const float* cov3D_precomp,
+                const float* viewmatrix,
+                const float* projmatrix,
+                const float tan_fovx, float tan_fovy,
+                const bool prefiltered,
+                int* radii,
+                bool debug);
     };
 }; // namespace CudaRasterizer
 
