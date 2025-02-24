@@ -138,6 +138,7 @@ void AnchorOptimizer::Optimize()
         // Anchor management
 
     }
+    std::cout << "[>>>AnchorOptimization] VisibleVoxelMask: " << VisibleVoxelMask << std::endl;
 
 
 }
@@ -172,6 +173,8 @@ void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch
         torch::exp(mAchorScales).to(torch::kCUDA), 
         torch::nn::functional::normalize(mAchorRotations).to(torch::kCUDA),
         Cov3DPrecomp);
+
+    VisibleVoxelMask = radii > 0;
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)

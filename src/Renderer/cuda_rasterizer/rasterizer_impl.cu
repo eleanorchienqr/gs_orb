@@ -437,8 +437,6 @@ void CudaRasterizer::Rasterizer::visible_filter(
 	int* radii,
 	bool debug)
 {
-    std::cout << "[>>>AnchorOptimization->CudaRasterizer::Rasterizer::visible_filter]" << std::endl;
-
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);
 
