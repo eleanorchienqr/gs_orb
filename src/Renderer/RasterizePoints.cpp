@@ -247,43 +247,44 @@ RasterizeGaussiansfilterCUDA(
   {
 	  int M = 0;
 
-	  CudaRasterizer::Rasterizer::visible_filter(
+    // Original version [have bugs]
+	//CudaRasterizer::Rasterizer::visible_filter(
+	//  geomFunc,
+	// 	binningFunc,
+	// 	imgFunc,
+	//  P, M,
+	// 	W, H,
+	// 	means3D.contiguous().data<float>(),
+	// 	scales.contiguous().data_ptr<float>(),
+	// 	scale_modifier,
+	// 	rotations.contiguous().data_ptr<float>(),
+	// 	cov3D_precomp.contiguous().data<float>(), 
+	// 	viewmatrix.contiguous().data<float>(), 
+	// 	projmatrix.contiguous().data<float>(),
+	// 	tan_fovx,
+	// 	tan_fovy,
+	// 	prefiltered,
+	// 	radii.contiguous().data<int>(),
+	// 	debug);
+    
+    CudaRasterizer::Rasterizer::visible_filter(
 	    geomFunc,
 		binningFunc,
 		imgFunc,
 	    P, M,
 		W, H,
-		means3D.contiguous().data<float>(),
+		means3D.contiguous().data_ptr<float>(),
 		scales.contiguous().data_ptr<float>(),
 		scale_modifier,
 		rotations.contiguous().data_ptr<float>(),
-		cov3D_precomp.contiguous().data<float>(), 
-		viewmatrix.contiguous().data<float>(), 
-		projmatrix.contiguous().data<float>(),
+		nullptr, 
+		viewmatrix.contiguous().data_ptr<float>(), 
+		projmatrix.contiguous().data_ptr<float>(),
 		tan_fovx,
 		tan_fovy,
 		prefiltered,
-		radii.contiguous().data<int>(),
+		radii.contiguous().data_ptr<int>(),
 		debug);
-
-    // CudaRasterizer::Rasterizer::visible_filter(
-	//     geomFunc,
-	// 	binningFunc,
-	// 	imgFunc,
-	//     P, M,
-	// 	W, H,
-	// 	means3D.contiguous().data_ptr<float>(),
-	// 	scales.contiguous().data_ptr<float>(),
-	// 	scale_modifier,
-	// 	rotations.contiguous().data_ptr<float>(),
-	// 	cov3D_precomp.contiguous().data_ptr<float>(), 
-	// 	viewmatrix.contiguous().data_ptr<float>(), 
-	// 	projmatrix.contiguous().data_ptr<float>(),
-	// 	tan_fovx,
-	// 	tan_fovy,
-	// 	prefiltered,
-	// 	radii.contiguous().data_ptr<int>(),
-	// 	debug);
   }
   return radii;
 }

@@ -167,11 +167,11 @@ void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch
     GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
     torch::cuda::synchronize();
 
-    // torch::Tensor radii = rasterizer.visible_filter(
-    //     mAchorPos, 
-    //     torch::exp(mAchorScales).to(torch::kCUDA), 
-    //     torch::nn::functional::normalize(mAchorRotations).to(torch::kCUDA),
-    //     Cov3DPrecomp);
+    torch::Tensor radii = rasterizer.visible_filter(
+        mAchorPos, 
+        torch::exp(mAchorScales).to(torch::kCUDA), 
+        torch::nn::functional::normalize(mAchorRotations).to(torch::kCUDA),
+        Cov3DPrecomp);
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)
