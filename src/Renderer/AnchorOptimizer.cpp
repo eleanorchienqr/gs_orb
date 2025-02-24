@@ -121,6 +121,14 @@ void AnchorOptimizer::Optimize()
 
     // Important variables
     torch::Tensor VisibleVoxelMask = torch::Tensor();
+    torch::Tensor NeuralOpacity = torch::Tensor(); // After VisibleVoxelMask Before NeuralGauMask
+    torch::Tensor NeuralGauMask = torch::Tensor(); 
+
+    torch::Tensor GauPos = torch::Tensor();        // After VisibleVoxelMask + NeuralGauMask
+    torch::Tensor GauColor = torch::Tensor();      // After VisibleVoxelMask + NeuralGauMask
+    torch::Tensor GauOpacity = torch::Tensor();    // After VisibleVoxelMask + NeuralGauMask
+    torch::Tensor GauScale = torch::Tensor();      // After VisibleVoxelMask + NeuralGauMask
+    torch::Tensor GauRot = torch::Tensor();        // After VisibleVoxelMask + NeuralGauMask
 
     for (int iter = 1; iter < mOptimizationParams.Iter + 1; ++iter) 
     {
@@ -130,6 +138,9 @@ void AnchorOptimizer::Optimize()
         PrefilterVoxel(ViewMatrix, ProjMatrix, CamCenter, VisibleVoxelMask);
 
         // Neural Gaussian derivation
+        GenerateNeuralGaussian(CamCenter, VisibleVoxelMask, 
+            GauPos, GauColor, GauOpacity, GauScale, GauRot, 
+            NeuralOpacity, NeuralGauMask);
 
         // Rasterization
 
@@ -138,8 +149,6 @@ void AnchorOptimizer::Optimize()
         // Anchor management
 
     }
-    std::cout << "[>>>AnchorOptimization] VisibleVoxelMask: " << VisibleVoxelMask << std::endl;
-
 
 }
 
@@ -175,6 +184,14 @@ void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch
         Cov3DPrecomp);
 
     VisibleVoxelMask = radii > 0;
+}
+
+void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelMask, 
+                                             torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
+                                             torch::Tensor& GauScale, torch::Tensor& GauRot,
+                                             torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauMask)
+{
+    std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian"  << std::endl;
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)

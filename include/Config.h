@@ -153,7 +153,7 @@ struct MonoGSOptimizationParameters
 
 struct ScaffoldOptimizationParams
 {
-    int Iter = 30;  // 30000
+    int Iter = 3;  // 30000
     float PercentDense = 0.01;
 
     // [Learning rate part] Fixed learning rate

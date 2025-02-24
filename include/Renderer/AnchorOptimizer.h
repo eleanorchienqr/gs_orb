@@ -26,6 +26,10 @@ protected:
 
     // Filters
     void PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelMask);
+    void GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelMask, 
+                                torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
+                                torch::Tensor& GauScale, torch::Tensor& GauRot,
+                                torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauMask);
 
     // Densification and prune
     // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
