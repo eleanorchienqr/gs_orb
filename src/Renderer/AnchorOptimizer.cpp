@@ -120,7 +120,7 @@ void AnchorOptimizer::Optimize()
     torch::Tensor GTImg = mTrainedImagesTensor[0];
 
     // Important variables
-    torch::Tensor VisibleVoxelMask = torch::Tensor();
+    torch::Tensor VisibleVoxelIndices = torch::Tensor();
     torch::Tensor NeuralOpacity = torch::Tensor(); // After VisibleVoxelMask Before NeuralGauMask
     torch::Tensor NeuralGauMask = torch::Tensor(); 
 
@@ -134,11 +134,11 @@ void AnchorOptimizer::Optimize()
     {
         
 
-        // Filter anchors in the Frustum
-        PrefilterVoxel(ViewMatrix, ProjMatrix, CamCenter, VisibleVoxelMask);
+        // Filter anchors in the Frustum VisibleVoxelMask [AnchorNum]
+        PrefilterVoxel(ViewMatrix, ProjMatrix, CamCenter, VisibleVoxelIndices);
 
         // Neural Gaussian derivation
-        GenerateNeuralGaussian(CamCenter, VisibleVoxelMask, 
+        GenerateNeuralGaussian(CamCenter, VisibleVoxelIndices, 
             GauPos, GauColor, GauOpacity, GauScale, GauRot, 
             NeuralOpacity, NeuralGauMask);
 
@@ -153,7 +153,7 @@ void AnchorOptimizer::Optimize()
 }
 
 // Filters
-void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelMask)
+void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelIndices)
 {
 
     // Note: no gradient
@@ -183,15 +183,60 @@ void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch
         torch::nn::functional::normalize(mAchorRotations).to(torch::kCUDA),
         Cov3DPrecomp);
 
-    VisibleVoxelMask = radii > 0;
+    torch::Tensor VisibleVoxelMask = radii > 0;
+    VisibleVoxelIndices = torch::nonzero(VisibleVoxelMask == true).squeeze(-1);
 }
 
-void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelMask, 
+void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelIndices, 
                                              torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
                                              torch::Tensor& GauScale, torch::Tensor& GauRot,
                                              torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauMask)
 {
     std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian"  << std::endl;
+    // 1. Filter [mAchorPos, mAchorFeatures, mOffsets, mAchorScales]
+    mAchorPos = mAchorPos.index_select(0, VisibleVoxelIndices);
+    mAchorFeatures = mAchorFeatures.index_select(0, VisibleVoxelIndices);
+    mOffsets = mOffsets.index_select(0, VisibleVoxelIndices);
+    mAchorScales = mAchorScales.index_select(0, VisibleVoxelIndices);
+
+    // 2. Get Cam-Anchor direction and distance [CamAnchorView, CamAnchorDist]
+    // torch::Tensor CamAnchorView = mAchorPos - CamCenter [3];
+    torch::Tensor CamCenterBroadcast = CamCenter.unsqueeze(0).repeat({mAchorPos.size(0), 1}); // [3] -> [AnchorNum, 3]
+    torch::Tensor CamAnchorDir = mAchorPos - CamCenterBroadcast;                              // [AnchorNum, 3]
+    torch::Tensor CamAnchorDist = CamAnchorDir.norm(-1, true).unsqueeze(-1);                  // [AnchorNum, 1]
+    torch::Tensor CamAnchorView = CamAnchorDir / CamAnchorDist.repeat({1, 3});                // [AnchorNum, 3]
+
+    // 3. Get weighted Feature through mFeatureMLP
+    torch::Tensor FeatureMLPInput = torch::cat({CamAnchorView, CamAnchorDist}, -1);           // [AnchorNum, 4] on GPU
+    // torch::Tensor FeatureWeight = mFeatureMLP.forward(FeatureMLPInput);                       // [AnchorNum, 3] on GPU
+    // struct Net : torch::nn::Module {
+    //     Net()
+    //     {
+    //         linear1 = register_module("linear1", torch::nn::Linear(4, 32));
+    //     }
+
+    //     torch::Tensor forward(torch::Tensor input) {
+    //         return linear1->forward(input);
+    //     }
+
+    //     torch::nn::Linear linear1{nullptr};
+    // };
+
+    // Net net();
+    // std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: MLPTest: " << net.forward(torch::ones({mAchorPos.size(0), 4})) << std::endl;
+    // bank_weight = pc.get_featurebank_mlp(cat_view).unsqueeze(dim=1) # [n, 1, 3]
+    // ## multi-resolution feat
+    // feat = feat.unsqueeze(dim=-1)
+    // feat = feat[:,::4, :1].repeat([1,4,1])*bank_weight[:,:,:1] + \
+    //     feat[:,::2, :1].repeat([1,2,1])*bank_weight[:,:,1:2] + \
+    //     feat[:,::1, :1]*bank_weight[:,:,2:]
+    // feat = feat.squeeze(dim=-1) # [n, c]
+
+    // for (const auto& p : mFeatureMLP.parameters()) {
+    //     std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: FeatureMLP params: " <<  p << std::endl;
+    // }
+
+    // std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: FeatureWeight: " <<  FeatureWeight << std::endl;
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)

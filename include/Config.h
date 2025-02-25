@@ -198,23 +198,24 @@ struct ScaffoldOptimizationParams
 
 // MLP structures
 struct FeatureBankMLP : torch::nn::Module {
-    FeatureBankMLP(int FeatureDim)
-    : linear1(torch::nn::Linear(4, FeatureDim)),
-        linear2(torch::nn::Linear(FeatureDim, 3))
+    FeatureBankMLP(int64_t FeatureDim)
     {
         // register_module() is needed if we want to use the parameters() method later on
-        register_module("linear1", linear1);
-        register_module("linear2", linear2);
+        linear1 = register_module("linear1", torch::nn::Linear(4, FeatureDim));
+        linear2 = register_module("linear2", torch::nn::Linear(FeatureDim, 3));
     }
 
     torch::Tensor forward(torch::Tensor x) 
     {
-        x = torch::relu(linear1(x));
-        x = torch::softmax(linear2(x), 1);
-        return x;
+        // x = torch::relu(linear1->forward(x));
+        // x = torch::softmax(linear2->forward(x), 1);
+        // return x;
+        return linear1->forward(x);
+
     }
 
-    torch::nn::Linear linear1, linear2;
+    // Use one of many "standard library" modules.
+    torch::nn::Linear linear1{nullptr}, linear2{nullptr};
 };
 
 struct OpacityMLP : torch::nn::Module {

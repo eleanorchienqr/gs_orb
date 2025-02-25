@@ -25,8 +25,8 @@ protected:
     void SetProjMatrix();
 
     // Filters
-    void PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelMask);
-    void GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelMask, 
+    void PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelIndices);
+    void GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelIndices, 
                                 torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
                                 torch::Tensor& GauScale, torch::Tensor& GauRot,
                                 torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauMask);
@@ -75,8 +75,8 @@ protected:
     torch::Tensor mAchorPos;            // [mSizeofAnchors, 3]
     torch::Tensor mAchorFeatures;       // [mSizeofAnchors, 32]
     torch::Tensor mAchorScales;         // [mSizeofAnchors, 3]
-    torch::Tensor mAchorRotations;      // [mSizeofAnchors, 1]
     torch::Tensor mOffsets;             // [mSizeofAnchors, mSizeofOffsets, 3]
+    torch::Tensor mAchorRotations;      // [mSizeofAnchors, 4] in func PrefilterVoxel
 
     ORB_SLAM3::FeatureBankMLP mFeatureMLP;                  // [input_dim, output_dim] = [3+1, mFeatureDim]
     ORB_SLAM3::OpacityMLP mOpacityMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
