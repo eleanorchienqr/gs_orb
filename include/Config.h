@@ -153,7 +153,7 @@ struct MonoGSOptimizationParameters
 
 struct ScaffoldOptimizationParams
 {
-    int Iter = 3;  // 30000
+    int Iter = 1;  // 30000
     float PercentDense = 0.01;
 
     // [Learning rate part] Fixed learning rate
@@ -198,22 +198,21 @@ struct ScaffoldOptimizationParams
 
 // MLP structures
 struct FeatureBankMLP : torch::nn::Module {
-    FeatureBankMLP(int64_t FeatureDim)
+    FeatureBankMLP(int64_t InputDim, int64_t OutputDim, int64_t FeatureDim)
     {
         // register_module() is needed if we want to use the parameters() method later on
-        linear1 = register_module("linear1", torch::nn::Linear(4, FeatureDim));
-        linear2 = register_module("linear2", torch::nn::Linear(FeatureDim, 3));
+        linear1 = register_module("linear1", torch::nn::Linear(InputDim, FeatureDim));
+        linear2 = register_module("linear2", torch::nn::Linear(FeatureDim, OutputDim));
     }
 
     torch::Tensor forward(torch::Tensor x) 
     {
-        // x = torch::relu(linear1->forward(x));
-        // x = torch::softmax(linear2->forward(x), 1);
-        // return x;
-        return linear1->forward(x);
+        x = torch::relu(linear1->forward(x));
+        x = torch::softmax(linear2->forward(x), 1);
+        return x;
+        // return linear1->forward(x);
 
     }
-
     // Use one of many "standard library" modules.
     torch::nn::Linear linear1{nullptr}, linear2{nullptr};
 };

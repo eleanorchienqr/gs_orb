@@ -3,6 +3,9 @@
 
 #include <Thirdparty/simple-knn/spatial.h>
 
+#include <c10/cuda/CUDAStream.h>
+#include <ATen/cuda/CUDAEvent.h>
+
 namespace GaussianSplatting{
     
 AnchorOptimizer::AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
@@ -122,7 +125,7 @@ void AnchorOptimizer::Optimize()
     // Important variables
     torch::Tensor VisibleVoxelIndices = torch::Tensor();
     torch::Tensor NeuralOpacity = torch::Tensor(); // After VisibleVoxelMask Before NeuralGauMask
-    torch::Tensor NeuralGauMask = torch::Tensor(); 
+    torch::Tensor NeuralGauIndices = torch::Tensor(); 
 
     torch::Tensor GauPos = torch::Tensor();        // After VisibleVoxelMask + NeuralGauMask
     torch::Tensor GauColor = torch::Tensor();      // After VisibleVoxelMask + NeuralGauMask
@@ -132,21 +135,48 @@ void AnchorOptimizer::Optimize()
 
     for (int iter = 1; iter < mOptimizationParams.Iter + 1; ++iter) 
     {
-        
-
         // Filter anchors in the Frustum VisibleVoxelMask [AnchorNum]
         PrefilterVoxel(ViewMatrix, ProjMatrix, CamCenter, VisibleVoxelIndices);
 
         // Neural Gaussian derivation
         GenerateNeuralGaussian(CamCenter, VisibleVoxelIndices, 
-            GauPos, GauColor, GauOpacity, GauScale, GauRot, 
-            NeuralOpacity, NeuralGauMask);
+            GauPos, GauColor, GauOpacity, GauScale, GauRot, NeuralOpacity, NeuralGauIndices);
+
+        std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: done: " << std::endl;
+        PrintCUDAUse();
 
         // Rasterization
+        torch::Tensor Cov3DPrecomp = torch::Tensor();
+        torch::Tensor SHSFeature = torch::Tensor();
+        torch::Tensor Means2D = torch::zeros_like(GauPos).to(torch::kCUDA).requires_grad_(true);
+        Means2D.retain_grad();
+
+        GaussianRasterizationSettings raster_settings = {
+            .image_height = static_cast<int>(mImHeight),
+            .image_width = static_cast<int>(mImWidth),
+            .tanfovx = mTanFovx,
+            .tanfovy = mTanFovy,
+            .bg = mBackground,
+            .scale_modifier = mScaleModifier,
+            .viewmatrix = ViewMatrix,
+            .projmatrix = ProjMatrix,
+            .sh_degree = 1,
+            .camera_center = CamCenter,
+            .prefiltered = mPrefiltered};
+
+        GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
+
+        torch::cuda::synchronize();
+
+        auto [rendererd_image, radii] = rasterizer.forward(
+            GauPos, Means2D, GauOpacity, SHSFeature, 
+            GauColor, GauScale, GauRot, Cov3DPrecomp);
 
         // Loss and backward
+        torch::Tensor loss = L1Loss(rendererd_image, GTImg);
+        loss.backward(); 
 
-        // Anchor management
+        // Anchor management and Optimizer setting
 
     }
 
@@ -190,8 +220,10 @@ void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch
 void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelIndices, 
                                              torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
                                              torch::Tensor& GauScale, torch::Tensor& GauRot,
-                                             torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauMask)
+                                             torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauIndices)
 {
+    using Slice = torch::indexing::Slice;
+
     std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian"  << std::endl;
     // 1. Filter [mAchorPos, mAchorFeatures, mOffsets, mAchorScales]
     mAchorPos = mAchorPos.index_select(0, VisibleVoxelIndices);
@@ -200,43 +232,41 @@ void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, cons
     mAchorScales = mAchorScales.index_select(0, VisibleVoxelIndices);
 
     // 2. Get Cam-Anchor direction and distance [CamAnchorView, CamAnchorDist]
-    // torch::Tensor CamAnchorView = mAchorPos - CamCenter [3];
     torch::Tensor CamCenterBroadcast = CamCenter.unsqueeze(0).repeat({mAchorPos.size(0), 1}); // [3] -> [AnchorNum, 3]
     torch::Tensor CamAnchorDir = mAchorPos - CamCenterBroadcast;                              // [AnchorNum, 3]
     torch::Tensor CamAnchorDist = CamAnchorDir.norm(-1, true).unsqueeze(-1);                  // [AnchorNum, 1]
     torch::Tensor CamAnchorView = CamAnchorDir / CamAnchorDist.repeat({1, 3});                // [AnchorNum, 3]
 
-    // 3. Get weighted Feature through mFeatureMLP
-    torch::Tensor FeatureMLPInput = torch::cat({CamAnchorView, CamAnchorDist}, -1);           // [AnchorNum, 4] on GPU
-    // torch::Tensor FeatureWeight = mFeatureMLP.forward(FeatureMLPInput);                       // [AnchorNum, 3] on GPU
-    // struct Net : torch::nn::Module {
-    //     Net()
-    //     {
-    //         linear1 = register_module("linear1", torch::nn::Linear(4, 32));
-    //     }
+    // 3. Get weighted Feature through mFeatureMLP [Index refers to https://pytorch.org/cppdocs/notes/tensor_indexing.html]
+    torch::Tensor FeatureMLPInput = torch::cat({CamAnchorView, CamAnchorDist}, -1);                     // [AnchorNum, 4] on GPU
+    torch::Tensor FeatureWeight = mFeatureMLP.forward(FeatureMLPInput).unsqueeze(1).repeat({1,32,1});   // [AnchorNum, mFeatureDim, 3] on GPU
+    mAchorFeatures = mAchorFeatures.index({Slice(), Slice(torch::indexing::None, torch::indexing::None, 4)}).repeat({1,4}) * FeatureWeight.index({Slice(), Slice(), 0}) \
+        + mAchorFeatures.index({Slice(), Slice(torch::indexing::None, torch::indexing::None, 2)}).repeat({1,2}) * FeatureWeight.index({Slice(), Slice(), 1}) \
+        + mAchorFeatures * FeatureWeight.index({Slice(), Slice(), 2});                                  // [AnchorNum, 32] on GPU
+    
+    // 4. Get Neural Opacity and Mask
+    torch::Tensor RestMLPInput = torch::cat({mAchorFeatures, CamAnchorView}, -1);   // [AnchorNum, mFeatureDim+3] on GPU
+    NeuralOpacity = mOpacityMLP.forward(RestMLPInput);                              // [AnchorNum, mSizeofOffsets] on GPU
+    NeuralOpacity = NeuralOpacity.view({-1});                                       // [AnchorNum * mSizeofOffsets] on GPU
+    NeuralGauIndices = torch::nonzero(NeuralOpacity > 0.f = true).squeeze(-1);      // [GauNum]
+    GauOpacity = NeuralOpacity.index_select(0, NeuralGauIndices).unsqueeze(-1);     // [GauNum, 1]
 
-    //     torch::Tensor forward(torch::Tensor input) {
-    //         return linear1->forward(input);
-    //     }
+    // 5. Get GauColor and GauCov with Mask
+    GauColor = mColorMLP.forward(RestMLPInput);
+    GauColor = GauColor.view({-1, 3}).index_select(0, NeuralGauIndices);            // [GauNum, 3]
 
-    //     torch::nn::Linear linear1{nullptr};
-    // };
+    torch::Tensor GauCov = mCovarianceMLP.forward(RestMLPInput);
+    GauCov = GauCov.view({-1, 7}).index_select(0, NeuralGauIndices);                // [GauNum, 7]
 
-    // Net net();
-    // std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: MLPTest: " << net.forward(torch::ones({mAchorPos.size(0), 4})) << std::endl;
-    // bank_weight = pc.get_featurebank_mlp(cat_view).unsqueeze(dim=1) # [n, 1, 3]
-    // ## multi-resolution feat
-    // feat = feat.unsqueeze(dim=-1)
-    // feat = feat[:,::4, :1].repeat([1,4,1])*bank_weight[:,:,:1] + \
-    //     feat[:,::2, :1].repeat([1,2,1])*bank_weight[:,:,1:2] + \
-    //     feat[:,::1, :1]*bank_weight[:,:,2:]
-    // feat = feat.squeeze(dim=-1) # [n, c]
+    // 5. Get repeatedAnchor, repeatedScale, Offsets with Mask
+    torch::Tensor  GauOffsets= mOffsets.view({-1, 3}).index_select(0, NeuralGauIndices);                                                    // [GauNum, 3]
+    torch::Tensor  RepeatedAnchors= mAchorPos.unsqueeze(1).repeat({1, mSizeofOffsets,1}).view({-1, 3}).index_select(0, NeuralGauIndices);   // [GauNum, 3]
+    torch::Tensor  RepeatedScales= mAchorScales.unsqueeze(1).repeat({1, mSizeofOffsets,1}).view({-1, 3}).index_select(0, NeuralGauIndices); // [GauNum, 3]
 
-    // for (const auto& p : mFeatureMLP.parameters()) {
-    //     std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: FeatureMLP params: " <<  p << std::endl;
-    // }
-
-    // std::cout << "[>>>AnchorOptimization] GenerateNeuralGaussian: FeatureWeight: " <<  FeatureWeight << std::endl;
+    // 6, Get GauSale, GauRot, GauPos
+    GauScale = RepeatedScales * torch::sigmoid(GauCov.index({Slice(), Slice(torch::indexing::None, 3)}));   // [GauNum, 3]
+    GauRot = torch::nn::functional::normalize(GauCov.index({Slice(), Slice(3, torch::indexing::None)}));    // [GauNum, 4]
+    GauPos = RepeatedAnchors + GauOffsets;                                                                  // [GauNum, 3]
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)
@@ -286,5 +316,29 @@ void AnchorOptimizer::SetProjMatrix()
     mProjMatrix = torch::from_blob(P.data(), {4, 4}, torch::kFloat).to(torch::kCUDA);
 }
 
+
+void AnchorOptimizer::PrintCUDAUse( )
+{
+    size_t free_byte;
+    size_t total_byte;
+ 
+    cudaError_t cuda_status = cudaMemGetInfo(&free_byte, &total_byte);
+ 
+    if (cudaSuccess != cuda_status) {
+        printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status));
+        exit(1);
+    }
+ 
+    double free_db = (double)free_byte;
+    double total_db = (double)total_byte;
+    double used_db_1 = (total_db - free_db) / 1024.0 / 1024.0;
+    std::cout << "Now used GPU memory " << used_db_1 << "  MB\n";
+}
+
+// Loss
+torch::Tensor AnchorOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) 
+{
+    return torch::abs((network_output - gt)).mean();
+}
 
 }

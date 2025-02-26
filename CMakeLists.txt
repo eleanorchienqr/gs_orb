@@ -27,6 +27,7 @@ LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
 # libtorch setup
 set(Torch_DIR ${PROJECT_SOURCE_DIR}/Thirdparty/libtorch/share/cmake/Torch)  
+# set(Torch_DIR /home/ray/Downloads/libtorch-cxx11-abi-shared-with-deps-2.5.1+cu121/libtorch/share/cmake/Torch) 
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CAMKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
@@ -198,12 +199,12 @@ ${Pangolin_LIBRARIES}
 ${PYTHON_LIBRARIES}
 ${TORCH_LIBRARIES}
 ${glfw3_LIBS}
-CUDA::cudart
-CUDA::cublas
-CUDA::cufft
-CUDA::curand
-CUDA::cusolver
-CUDA::cusparse
+#CUDA::cudart
+#CUDA::cublas
+#CUDA::cufft
+#CUDA::curand
+#CUDA::cusolver
+#CUDA::cusparse
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
 -lboost_serialization

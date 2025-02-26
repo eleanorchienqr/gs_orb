@@ -29,7 +29,7 @@ protected:
     void GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelIndices, 
                                 torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
                                 torch::Tensor& GauScale, torch::Tensor& GauRot,
-                                torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauMask);
+                                torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauIndices);
 
     // Densification and prune
     // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
@@ -47,6 +47,9 @@ protected:
     // Learning rate updater
     void UpdateLR(const float iteration);
 
+    // Loss
+    torch::Tensor L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt);
+
     // Utils
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
 
@@ -54,6 +57,9 @@ protected:
     // void UpdateIndiceForestAfterClone(const torch::Tensor indices);
     // void UpdateIndiceForestAfterSplit(const torch::Tensor indices);
     // void UpdateIndiceForestAfterPrune(const torch::Tensor indices);
+
+    // Debug
+    static void PrintCUDAUse();
 
 protected:
     // 1. Setting

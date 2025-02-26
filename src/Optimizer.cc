@@ -6011,7 +6011,7 @@ void Optimizer::GlobalAchorInitOptimization(Map* pMap)
     }
     
     // 2.2 Atlas associated MLP members [referring to https://pytorch.org/tutorials/advanced/cpp_frontend.html]
-    ORB_SLAM3::FeatureBankMLP FBNet(AnchorFeatureDim);
+    ORB_SLAM3::FeatureBankMLP FBNet(4, 3, AnchorFeatureDim);                    // [InputDim, OutputDim, FeatureDim]
     ORB_SLAM3::OpacityMLP OpacityNet(AnchorFeatureDim, AnchorSizeofOffsets);
     ORB_SLAM3::CovarianceMLP CovNet(AnchorFeatureDim, AnchorSizeofOffsets);
     ORB_SLAM3::ColorMLP ColorNet(AnchorFeatureDim, AnchorSizeofOffsets);
