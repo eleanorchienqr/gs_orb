@@ -200,6 +200,10 @@ struct ScaffoldOptimizationParams
     int UpdateFrom = 1;         // 1500
     int UpdateInterval = 1;     // 100
     int UpdateUntil  = 15'000;
+
+    float MinOpacity = 0.005;
+    float SuccessTh = 0.8;
+    float DensifyGradTh = 0.0002;
 };
 
 // MLP structures

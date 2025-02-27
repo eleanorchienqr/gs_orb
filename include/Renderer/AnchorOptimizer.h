@@ -34,7 +34,8 @@ protected:
     // Densification and prune
     // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
     void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices, const torch::Tensor VisibleVoxelIndices);
-    // void DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size);
+    void DensifyAndPrune(float MinOpacity, float SuccessTh, float DensifyGradTh);
+    
     // void DensifyAndClone(torch::Tensor& grads, float grad_threshold);
     // void DensifyAndSplit(torch::Tensor& grads, float grad_threshold, float min_opacity, float max_screen_size);
     // void PrunePoints(torch::Tensor mask);

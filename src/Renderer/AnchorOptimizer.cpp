@@ -183,8 +183,7 @@ void AnchorOptimizer::Optimize()
                 if (iter > mOptimizationParams.UpdateFrom && iter % mOptimizationParams.UpdateInterval == 0)
                 {
                     // DensifyAndPrune;
-                    std::cout << "[>>>AnchorOptimization] Anchor Management: Begin: " << std::endl;
-                    PrintCUDAUse();
+                    DensifyAndPrune(mOptimizationParams.MinOpacity, mOptimizationParams.SuccessTh, mOptimizationParams.DensifyGradTh);
                 }
 
             }
@@ -322,6 +321,17 @@ void AnchorOptimizer::AddDensificationStats(const torch::Tensor Means2D, const t
     torch::Tensor GradNorm = Means2D.grad().index_select(0, VisibilityFilter.nonzero().squeeze()).slice(1, 0, 2).norm(2, -1, true);
     mOffsetGradientAccum.index_put_({IntegratedMask}, mOffsetGradientAccum.index_select(0, IntegratedMask.nonzero().squeeze()) + GradNorm); 
     mOffsetDenom.index_put_({IntegratedMask}, mOffsetDenom.index_select(0, IntegratedMask.nonzero().squeeze()) + 1); 
+}
+
+void AnchorOptimizer::DensifyAndPrune(float MinOpacity, float SuccessTh, float DensifyGradTh) 
+{
+    std::cout << "[>>>AnchorOptimization] Anchor Management: DensifyAndPrune: " << std::endl;
+    PrintCUDAUse();
+    // torch::Tensor grads = mPosGradientAccum / mDenom;
+    // grads.index_put_({grads.isnan()}, 0.0);
+
+    // DensifyAndClone(grads, max_grad);
+    // DensifyAndSplit(grads, max_grad, min_opacity, max_screen_size);
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)
