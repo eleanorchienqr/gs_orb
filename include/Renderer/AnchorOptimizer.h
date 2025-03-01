@@ -34,11 +34,11 @@ protected:
     // Densification and prune
     // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
     void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices, const torch::Tensor VisibleVoxelIndices);
-    void DensifyAndPrune(float MinOpacity, float SuccessTh, float DensifyGradTh);
-    
-    // void DensifyAndClone(torch::Tensor& grads, float grad_threshold);
-    // void DensifyAndSplit(torch::Tensor& grads, float grad_threshold, float min_opacity, float max_screen_size);
-    // void PrunePoints(torch::Tensor mask);
+    void DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh);
+    void DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm);
+
+    // void DensifyAnchors(torch::Tensor& grads, float grad_threshold);
+    // void PruneAnchors(torch::Tensor mask);
 
     // void DensificationPostfix(torch::Tensor& newMeans3D, torch::Tensor& newFeaturesDC, torch::Tensor& newFeaturesRest,
     //                           torch::Tensor& newScales, torch::Tensor& newRotation, torch::Tensor& newOpacity);
@@ -71,13 +71,18 @@ protected:
     {
 
     };
-
+    // 1.1 Basic settings
     int mSizeofAnchors;
     int mSizeofOffsets = 5;
     int mFeatureDim = 32;
     int mAppearanceDim = 32;
 
     float mVoxelSize = 0.01;
+
+    // 1.2 Densify and Prune settings
+    int mHierachyLayerNum = 3;
+    int mHierachyFVoxelSizeFactor = 4;
+
 
     // 2. Learnable members
     torch::Tensor mAchorPos;            // [mSizeofAnchors, 3]

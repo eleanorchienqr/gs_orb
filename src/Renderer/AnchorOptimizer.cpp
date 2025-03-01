@@ -183,7 +183,8 @@ void AnchorOptimizer::Optimize()
                 if (iter > mOptimizationParams.UpdateFrom && iter % mOptimizationParams.UpdateInterval == 0)
                 {
                     // DensifyAndPrune;
-                    DensifyAndPrune(mOptimizationParams.MinOpacity, mOptimizationParams.SuccessTh, mOptimizationParams.DensifyGradTh);
+                    // DensifyAndPrune(mOptimizationParams.UpdateInterval, mOptimizationParams.MinOpacity, mOptimizationParams.SuccessTh, mOptimizationParams.DensifyGradTh);
+                    DensifyAndPrune(1, 0.005, 0.8, 0.0002);
                 }
 
             }
@@ -323,15 +324,65 @@ void AnchorOptimizer::AddDensificationStats(const torch::Tensor Means2D, const t
     mOffsetDenom.index_put_({IntegratedMask}, mOffsetDenom.index_select(0, IntegratedMask.nonzero().squeeze()) + 1); 
 }
 
-void AnchorOptimizer::DensifyAndPrune(float MinOpacity, float SuccessTh, float DensifyGradTh) 
+void AnchorOptimizer::DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh) 
 {
-    std::cout << "[>>>AnchorOptimization] Anchor Management: DensifyAndPrune: " << std::endl;
-    PrintCUDAUse();
-    // torch::Tensor grads = mPosGradientAccum / mDenom;
-    // grads.index_put_({grads.isnan()}, 0.0);
+    // 1. Compute gradient norm and offset denom mask
+    torch::Tensor OffsetGrads = mOffsetGradientAccum / mOffsetDenom;    // [mSizeofAnchors*mSizeofOffsets, 1]
+    OffsetGrads.index_put_({OffsetGrads.isnan()}, 0.0);
+    torch::Tensor OffsetGradNorm = OffsetGrads.norm(-1, true);          // [mSizeofAnchors*mSizeofOffsets]
 
-    // DensifyAndClone(grads, max_grad);
-    // DensifyAndSplit(grads, max_grad, min_opacity, max_screen_size);
+    torch::Tensor OffsetDenomMask = mOffsetDenom > UpdateInterval * SuccessTh * 0.5;
+    OffsetDenomMask = OffsetDenomMask.squeeze(-1);                      // [mSizeofAnchors*mSizeofOffsets]
+
+    // 2. Anchor Densification
+    DensifyAnchors(DensifyGradTh, OffsetDenomMask, OffsetGradNorm);
+    
+    // 3. Update mOffsetGradientAccum, mOffsetDenom
+
+    // 4. Compute Prune mask
+
+    // 5. Anchor Pruning
+
+    // 6. Update mOffsetGradientAccum, mOffsetDenom, mOpacityAccum
+}
+
+void AnchorOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm)
+{
+    // Densify anchors through different resolutions
+    const int OriginalAnchorNum = mAchorPos.size(0);                              //! mAchorPos sze increased through each following cycle
+    for(int i = 0; i < mHierachyLayerNum; i++)
+    {
+        // 1. Select significant neural Gaussians
+        const float ScaledGauGradTh = DensifyGradTh * std::pow(std::sqrt(mHierachyFVoxelSizeFactor), i);
+        torch::Tensor GauGradMask = OffsetGradNorm >= ScaledGauGradTh;      // [OriginalAnchorNum*mSizeofOffsets]
+        GauGradMask = torch::logical_and(GauGradMask, OffsetDenomMask);     // [OriginalAnchorNum*mSizeofOffsets]
+
+        torch::Tensor RandomEliminationMask = torch::randn({GauGradMask.size(0)}).to(torch::kCUDA) > std::pow(0.5f, i + 1);
+
+        torch::Tensor CandidateAnchorMask = torch::logical_and(GauGradMask, RandomEliminationMask); // [OriginalAnchorNum*mSizeofOffsets]
+
+        // Make sure the rightness of Mask's demension related to mAchorPos's size
+        const int CurrentAnchorNum = mAchorPos.size(0); 
+
+        if(CurrentAnchorNum < OriginalAnchorNum)
+            break;
+        else if(CurrentAnchorNum > OriginalAnchorNum)
+        {
+            const int IncreasedAnchorNum = CurrentAnchorNum - OriginalAnchorNum;
+            CandidateAnchorMask = torch::cat({CandidateAnchorMask, torch::zeros({IncreasedAnchorNum * mSizeofOffsets}, torch::dtype(torch::kBool)).to(torch::kCUDA)}, 0);    // [CurrentAnchorNum*mSizeofOffsets]
+        }
+
+        torch::Tensor NerualGauPos = mAchorPos.unsqueeze(1).repeat({1, mSizeofOffsets, 1}) + mOffsets * torch::exp(mAchorScales.unsqueeze(1).repeat({1, mSizeofOffsets, 1})); // [CurrentAnchorNum, mSizeofOffsets, 3]
+        torch::Tensor NewAnchorPos = NerualGauPos.view({-1, 3}).index_select(0, CandidateAnchorMask.nonzero().squeeze(-1));
+
+        // Update Optimizer
+
+        std::cout << "[>>>AnchorOptimization] Anchor Management: DensifyAndPrune: NewAnchorPos " << NewAnchorPos.nonzero() << std::endl;
+        PrintCUDAUse();
+
+    }
+    
+
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)
