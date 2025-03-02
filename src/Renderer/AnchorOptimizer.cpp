@@ -46,8 +46,8 @@ AnchorOptimizer::AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureD
                     // Anchor Management Members initialization
                     mOpacityAccum = torch::zeros({mSizeofAnchors, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                             // [mSizeofAnchors, 1]
                     mOffsetGradientAccum = torch::zeros({mSizeofAnchors * mSizeofOffsets, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);     // [mSizeofAnchors*mSizeofOffsets, 1]
-                    mOffsetDenom = torch::zeros({mSizeofAnchors * mSizeofOffsets, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);             // [mSizeofAnchors*mSizeofOffsets, 1]
-                    mAnchorDenom = torch::zeros({mSizeofAnchors, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                              // [mSizeofAnchors, 1]
+                    mOffsetDenom = torch::zeros({mSizeofAnchors * mSizeofOffsets, 1}, torch::dtype(torch::kInt32)).to(torch::kCUDA);             // [mSizeofAnchors*mSizeofOffsets, 1]
+                    mAnchorDenom = torch::zeros({mSizeofAnchors, 1}, torch::dtype(torch::kInt32)).to(torch::kCUDA);                              // [mSizeofAnchors, 1]
                 }
 
 void AnchorOptimizer::TrainingSetup()
@@ -179,14 +179,8 @@ void AnchorOptimizer::Optimize()
             if (iter > mOptimizationParams.StartStatistic && iter < mOptimizationParams.UpdateUntil)
             {
                 AddDensificationStats(Means2D, radii, NeuralOpacity, NeuralGauIndices, VisibleVoxelIndices);
-
                 if (iter > mOptimizationParams.UpdateFrom && iter % mOptimizationParams.UpdateInterval == 0)
-                {
-                    // DensifyAndPrune;
-                    // DensifyAndPrune(mOptimizationParams.UpdateInterval, mOptimizationParams.MinOpacity, mOptimizationParams.SuccessTh, mOptimizationParams.DensifyGradTh);
                     DensifyAndPrune(1, 0.005, 0.8, 0.0002);
-                }
-
             }
 
             //  Optimizer step
@@ -195,10 +189,7 @@ void AnchorOptimizer::Optimize()
                 mOptimizer->zero_grad(true);
                 UpdateLR(iter);
             }
-
         }
-
-
     }
 
 }
@@ -336,14 +327,14 @@ void AnchorOptimizer::DensifyAndPrune(const int UpdateInterval, const float MinO
 
     // 2. Anchor Densification
     DensifyAnchors(DensifyGradTh, OffsetDenomMask, OffsetGradNorm);
-    
-    // 3. Update mOffsetGradientAccum, mOffsetDenom
 
-    // 4. Compute Prune mask
+    // 3. Compute Prune mask
+    torch::Tensor PruneMask = mOpacityAccum < MinOpacity * mAnchorDenom;
+    torch::Tensor AnchorDemonMask = mAnchorDenom > UpdateInterval * SuccessTh;
+    PruneMask = torch::logical_and(PruneMask.squeeze(1), AnchorDemonMask.squeeze(1));
 
-    // 5. Anchor Pruning
-
-    // 6. Update mOffsetGradientAccum, mOffsetDenom, mOpacityAccum
+    // 4. Anchor Pruning
+    PruneAnchors(PruneMask);
 }
 
 void AnchorOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm)
@@ -376,13 +367,104 @@ void AnchorOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Ten
         torch::Tensor NewAnchorPos = NerualGauPos.view({-1, 3}).index_select(0, CandidateAnchorMask.nonzero().squeeze(-1));
 
         // Update Optimizer
+        int NewAnchorNum = NewAnchorPos.size(0);
+        float CurrentVoxelSize = mVoxelSize / std::pow(mHierachyFVoxelSizeFactor, i); // Sacffold (10-1)
 
-        std::cout << "[>>>AnchorOptimization] Anchor Management: DensifyAndPrune: NewAnchorPos " << NewAnchorPos.nonzero() << std::endl;
-        PrintCUDAUse();
+        torch::Tensor NewAnchorFeatures  = torch::zeros({NewAnchorNum, mFeatureDim}, torch::dtype(torch::kFloat)).to(torch::kCUDA);       // [NewAnchorNum, AnchorFeatureDim]
+        torch::Tensor NewAnchorOffsets  = torch::zeros({NewAnchorNum, mSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [NewAnchorNum, AnchorSizeofOffsets, 3]
+        torch::Tensor NewAnchorRotations  = torch::zeros({NewAnchorNum, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                               // [NewAnchorNum, 4]
+        torch::Tensor NewAnchorScales  = torch::log(torch::ones({NewAnchorNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA) * CurrentVoxelSize);    // [NewAnchorNum, 3]
+        
+        NewAnchorFeatures = mAchorFeatures.unsqueeze(1).repeat({1, mSizeofOffsets, 1}).view({-1, mFeatureDim}).index_select(0, CandidateAnchorMask.nonzero().squeeze(-1));
+        NewAnchorRotations.index_put_({torch::indexing::Slice(), 0}, 1.f);
 
+        // Update Optimizer
+        DensificationPostfix(NewAnchorPos, NewAnchorFeatures, NewAnchorOffsets, NewAnchorRotations, NewAnchorScales); 
+
+        // Update Anchor denom and opacity sccumulation
+        mSizeofAnchors += NewAnchorNum;
+        mAnchorDenom = torch::cat({mAnchorDenom, torch::zeros({NewAnchorNum, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA)}, 0);
+        mOpacityAccum = torch::cat({mOpacityAccum, torch::zeros({NewAnchorNum, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA)}, 0);
+
+        std::cout << "[>>>AnchorOptimization] Anchor Management: After densification: NewAnchorNum " << NewAnchorNum << std::endl;
     }
+
+    // Update Offset denom and gradiant accumulation
+    mOffsetDenom.index_put_({OffsetDenomMask}, 0);
+    torch::Tensor NewOffetDenom = torch::zeros({mSizeofAnchors * mSizeofOffsets - mOffsetDenom.size(0), 1}, torch::dtype(torch::kInt32)).to(torch::kCUDA);
+    mOffsetDenom = torch::cat({mOffsetDenom, NewOffetDenom}, 0);                            // [mSizeofAnchors*mSizeofOffsets, 1]
+
+    mOffsetGradientAccum.index_put_({OffsetDenomMask}, 0);
+    torch::Tensor NewOffetGradientAccum = torch::zeros({mSizeofAnchors * mSizeofOffsets - mOffsetGradientAccum.size(0), 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);
+    mOffsetGradientAccum = torch::cat({mOffsetGradientAccum, NewOffetGradientAccum}, 0);    // [mSizeofAnchors*mSizeofOffsets, 1]
+}
+
+void AnchorOptimizer::DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, torch::Tensor& NewAnchorOffsets,
+                                           torch::Tensor& NewAnchorRotations, torch::Tensor& NewAnchorScales) 
+{
+    CatTensorstoOptimizer(NewAnchorPos, mAchorPos, 0);
+    CatTensorstoOptimizer(NewAnchorOffsets, mOffsets, 1);
+    CatTensorstoOptimizer(NewAnchorFeatures, mAchorFeatures, 2);
+    CatTensorstoOptimizer(NewAnchorScales, mAchorScales, 3);
+    // CatTensorstoOptimizer(NewAnchorRotations, mAchorRotations, 4);
+    mAchorRotations = torch::cat({mAchorRotations, NewAnchorRotations}, 0); // Optimizer error
+}
+
+void AnchorOptimizer::CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position) 
+{
+    auto adamParamStates = std::make_unique<torch::optim::AdamParamState>(static_cast<torch::optim::AdamParamState&>(
+        *mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()]));
+    
+    mOptimizer->state().erase(mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl());
+
+    adamParamStates->exp_avg(torch::cat({adamParamStates->exp_avg(), torch::zeros_like(extension_tensor)}, 0));
+    adamParamStates->exp_avg_sq(torch::cat({adamParamStates->exp_avg_sq(), torch::zeros_like(extension_tensor)}, 0));
+
+    mOptimizer->param_groups()[param_position].params()[0] = torch::cat({old_tensor, extension_tensor}, 0).set_requires_grad(true);
+    old_tensor = mOptimizer->param_groups()[param_position].params()[0];
+
+    mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
+}
+
+void AnchorOptimizer::PruneAnchors(torch::Tensor mask)
+{
+    torch::Tensor ValidAnchorMask = ~mask; 
+    int TrueCount = ValidAnchorMask.sum().item<int>();
+
+    torch::Tensor indices = torch::nonzero(ValidAnchorMask == true).index({torch::indexing::Slice(torch::indexing::None, torch::indexing::None), torch::indexing::Slice(torch::indexing::None, 1)}).squeeze(-1);
     
 
+    PruneOptimizer(mAchorPos, indices, 0);
+    PruneOptimizer(mOffsets, indices, 1);
+    PruneOptimizer(mAchorFeatures, indices, 2);
+    PruneOptimizer(mAchorScales, indices, 3);
+    // PruneOptimizer(mAchorRotations, indices, 4);
+    mAchorRotations = mAchorRotations.index_select(0, indices);
+
+    // Update Anchor and offset members
+    mSizeofAnchors = TrueCount;
+    mAnchorDenom = mAnchorDenom.index_select(0, indices);
+    mOpacityAccum = mOpacityAccum.index_select(0, indices);
+    mOffsetDenom = mOffsetDenom.view({-1, mSizeofOffsets}).index_select(0, indices).view({-1, 1});
+    mOffsetGradientAccum = mOffsetGradientAccum.view({-1, mSizeofOffsets}).index_select(0, indices).view({-1, 1});
+
+    // if anchors_mask.sum()>0:
+    //     self.opacity_accum[anchors_mask] = torch.zeros([anchors_mask.sum(), 1], device='cuda').float()
+    //     self.anchor_demon[anchors_mask] = torch.zeros([anchors_mask.sum(), 1], device='cuda').float(
+}
+
+void AnchorOptimizer::PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position)
+{
+    auto adamParamStates = std::make_unique<torch::optim::AdamParamState>(static_cast<torch::optim::AdamParamState&>(
+        *mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] ));
+    mOptimizer->state().erase(mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl());
+
+    adamParamStates->exp_avg(adamParamStates->exp_avg().index_select(0, mask));
+    adamParamStates->exp_avg_sq(adamParamStates->exp_avg_sq().index_select(0, mask));
+
+    mOptimizer->param_groups()[param_position].params()[0] = old_tensor.index_select(0, mask).set_requires_grad(true);
+    old_tensor = mOptimizer->param_groups()[param_position].params()[0]; // update old tensor
+    mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
 }
 
 void AnchorOptimizer::UpdateLR(const float iteration)

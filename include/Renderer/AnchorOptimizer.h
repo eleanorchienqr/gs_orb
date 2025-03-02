@@ -36,13 +36,14 @@ protected:
     void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices, const torch::Tensor VisibleVoxelIndices);
     void DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh);
     void DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm);
+    void PruneAnchors(torch::Tensor mask);
 
-    // void DensifyAnchors(torch::Tensor& grads, float grad_threshold);
+    void DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, 
+                              torch::Tensor& NewAnchorOffsets, torch::Tensor& NewAnchorRotations, torch::Tensor& NewAnchorScales);
+    void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
+    void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
+
     // void PruneAnchors(torch::Tensor mask);
-
-    // void DensificationPostfix(torch::Tensor& newMeans3D, torch::Tensor& newFeaturesDC, torch::Tensor& newFeaturesRest,
-    //                           torch::Tensor& newScales, torch::Tensor& newRotation, torch::Tensor& newOpacity);
-    // void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
     // void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
     // void ResetOpacity();
     
