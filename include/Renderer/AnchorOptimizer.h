@@ -55,7 +55,8 @@ protected:
 
     // Utils
     inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
-
+    cv::Mat TensorToCVMat(torch::Tensor tensor);
+    float PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img);
     // Tree management
     // void UpdateIndiceForestAfterClone(const torch::Tensor indices);
     // void UpdateIndiceForestAfterSplit(const torch::Tensor indices);

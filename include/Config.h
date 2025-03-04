@@ -153,7 +153,7 @@ struct MonoGSOptimizationParameters
 
 struct ScaffoldOptimizationParams
 {
-    int Iter = 5;  // 30000
+    int Iter = 1050;  // 30000
     float PercentDense = 0.01;
 
     // [Learning rate part] Fixed learning rate
@@ -197,8 +197,8 @@ struct ScaffoldOptimizationParams
 
     // Anchor densification
     int StartStatistic = 0;     // 500
-    int UpdateFrom = 1;         // 1500
-    int UpdateInterval = 1;     // 100
+    int UpdateFrom = 0;         // 1500
+    int UpdateInterval = 100;     // 100
     int UpdateUntil  = 15'000;
 
     float MinOpacity = 0.005;

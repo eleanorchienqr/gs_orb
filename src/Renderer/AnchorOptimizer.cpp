@@ -169,6 +169,22 @@ void AnchorOptimizer::Optimize()
             GauPos, Means2D, GauOpacity, SHSFeature, 
             GauColor, GauScale, GauRot, Cov3DPrecomp);
 
+        // Image debug
+        if(iter == mOptimizationParams.Iter)
+        {
+            torch::NoGradGuard no_grad;
+
+            cv::Mat RenderImg = TensorToCVMat(rendererd_image);
+            cv::imwrite("Scaffold_InitialImage.png", RenderImg);
+            // std::cout << "[AnchorOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image.index({"...", 0, "..."}) << std::endl;
+
+            cv::Mat TrianedImg = TensorToCVMat(GTImg);
+            cv::imwrite("Scaffold_InitialTrainedImage.png", TrianedImg);
+
+            float psnr = PSNR(rendererd_image, GTImg);
+            std::cout << "[AnchorOptimizer::OptimizeMonoGS] Debug;psnr: " << psnr << std::endl;
+        }
+
         // Loss and backward
         torch::Tensor loss = L1Loss(rendererd_image, GTImg);
         loss.backward(); 
@@ -537,6 +553,26 @@ void AnchorOptimizer::PrintCUDAUse( )
 torch::Tensor AnchorOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) 
 {
     return torch::abs((network_output - gt)).mean();
+}
+
+//Utils
+cv::Mat AnchorOptimizer::TensorToCVMat(torch::Tensor tensor)
+{
+    torch::Tensor detached_tensor = tensor.detach().clamp(0.f, 1.f) * 255;
+    detached_tensor = detached_tensor.to(torch::kUInt8);
+    detached_tensor = detached_tensor.permute({1, 2, 0}).contiguous().to(torch::kCPU);
+
+    int64_t height = detached_tensor.size(0);
+    int64_t width = detached_tensor.size(1);
+    cv::Mat mat = cv::Mat(height, width, CV_8UC3, detached_tensor.data_ptr());
+
+    return mat.clone();
+}
+
+float AnchorOptimizer::PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img) {
+    torch::Tensor squared_diff = (rendered_img - gt_img).pow(2);
+    torch::Tensor mse_val = squared_diff.view({rendered_img.size(0), -1}).mean(1, true);
+    return (20.f * torch::log10(1.0 / mse_val.sqrt())).mean().item<float>();
 }
 
 }
