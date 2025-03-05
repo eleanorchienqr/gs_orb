@@ -206,6 +206,66 @@ struct ScaffoldOptimizationParams
     float DensifyGradTh = 0.0002;
 };
 
+struct RenderOptimizationParams
+{
+    int Iter = 105;  // 30000
+    float PercentDense = 0.01;
+
+    // [Learning rate part] Fixed learning rate
+    float FeatureLR = 0.0075;
+    float ScalingLR = 0.007;
+    float RotationLR = 0.002;
+
+    // [Learning rate part] Scheduled learning rate
+    float AnchorLRInit = 0.0;
+    float AnchorLRFinal  = 0.0;
+    float AnchorLRDelayMult = 0.01;
+    int AnchorLRMaxSteps = 30'000;
+
+    float OffsetLRInit = 0.01;
+    float OffsetLRFinal  = 0.0001;
+    float OffsetLRDelayMult = 0.01;
+    int OffsetLRMaxSteps = 30'000;
+
+    float FeatureBankMLPLRInit = 0.01;
+    float FeatureBankMLPLRFinal  = 0.00001;
+    float FeatureBankMLPLRDelayMult = 0.01;
+    int FeatureBankMLPLRMaxSteps = 30'000;
+
+    float OpacityMLPLRInit = 0.002;
+    float OpacityMLPLRFinal  = 0.00002;
+    float OpacityMLPLRDelayMult = 0.01;
+    int OpacityMLPLRMaxSteps = 30'000;
+
+    float CovarianceMLPLRInit = 0.004;
+    float CovarianceMLPLRFinal  = 0.004;
+    float CovarianceMLPLRDelayMult = 0.01;
+    int CovarianceMLPLRMaxSteps = 30'000;
+
+    float ColorMLPLRInit = 0.008;
+    float ColorMLPLRFinal  = 0.0005;
+    float ColorMLPLRDelayMult = 0.01;
+    int ColorMLPLRMaxSteps = 30'000;
+
+    // [Learning rate part] Spatial scale
+    float SpatialLRScale = 6.0;
+
+    // Anchor densification
+    int StartStatistic = 0;     // 500
+    int UpdateFrom = 0;         // 1500
+    int UpdateInterval = 10;     // 100
+    int UpdateUntil  = 15'000;
+
+    float MinOpacity = 0.005;
+    float SuccessTh = 0.8;
+    float DensifyGradTh = 0.0002;
+};
+
+struct RenderModelnParams
+{
+
+};
+
 // MLP structures
 struct FeatureBankMLP : torch::nn::Module {
     FeatureBankMLP(int64_t InputDim, int64_t OutputDim, int64_t FeatureDim)
@@ -281,6 +341,26 @@ struct ColorMLP : torch::nn::Module {
     {
         x = torch::relu(linear1(x));
         x = torch::sigmoid(linear2(x));
+        return x;
+    }
+
+    torch::nn::Linear linear1, linear2;
+};
+
+struct FreqColorMLP : torch::nn::Module {
+    FreqColorMLP(int FeatureDim, int OffsetNum)
+    : linear1(torch::nn::Linear(FeatureDim + 3, FeatureDim)),
+        linear2(torch::nn::Linear(FeatureDim, 3 * OffsetNum))
+    {
+        // register_module() is needed if we want to use the parameters() method later on
+        register_module("linear1", linear1);
+        register_module("linear2", linear2);
+    }
+
+    torch::Tensor forward(torch::Tensor x) 
+    {
+        x = torch::relu(linear1(x));
+        x = torch::sigmoid(torch::cos(linear2(x)));
         return x;
     }
 

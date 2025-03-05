@@ -446,7 +446,7 @@ void GaussianOptimizer::Optimize()
 
 void GaussianOptimizer::OptimizeMonoGS()
 {
-    std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
+    // std::cout << "[GaussianOptimizer::OptimizeMonoGS] Start" << std::endl;
 
     for (int iter = 1; iter < mOptimParams.iterations + 1; ++iter) {
         
@@ -544,6 +544,9 @@ void GaussianOptimizer::OptimizeMonoGS()
             }
         }
     }
+
+    std::cout << "[>>>GaussianOptimization] All Gaussians Nums after first optimization " << mSizeofGaussians << std::endl;
+    PrintCUDAUse();
 }
 
 void GaussianOptimizer::DensifyAndPrune(float max_grad, float min_opacity, float max_screen_size) {
@@ -1196,6 +1199,24 @@ float GaussianOptimizer::PSNR(const torch::Tensor& rendered_img, const torch::Te
     torch::Tensor squared_diff = (rendered_img - gt_img).pow(2);
     torch::Tensor mse_val = squared_diff.view({rendered_img.size(0), -1}).mean(1, true);
     return (20.f * torch::log10(1.0 / mse_val.sqrt())).mean().item<float>();
+}
+
+void GaussianOptimizer::PrintCUDAUse( )
+{
+    size_t free_byte;
+    size_t total_byte;
+ 
+    cudaError_t cuda_status = cudaMemGetInfo(&free_byte, &total_byte);
+ 
+    if (cudaSuccess != cuda_status) {
+        printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status));
+        exit(1);
+    }
+ 
+    double free_db = (double)free_byte;
+    double total_db = (double)total_byte;
+    double used_db_1 = (total_db - free_db) / 1024.0 / 1024.0;
+    std::cout << "Now used GPU memory " << used_db_1 << "  MB\n";
 }
 
 }

@@ -1,3 +1,7 @@
+/*
+Main func: use original gaussian splatting as the  backnone
+*/
+
 #include <torch/torch.h>
 #include <deque>
 
@@ -147,6 +151,9 @@ public:
     void UpdateIndiceForestAfterClone(const torch::Tensor indices);
     void UpdateIndiceForestAfterSplit(const torch::Tensor indices);
     void UpdateIndiceForestAfterPrune(const torch::Tensor indices);
+
+    // Debug
+    static void PrintCUDAUse();
 
 protected:
     ORB_SLAM3::OptimizationParameters mOptimParams;

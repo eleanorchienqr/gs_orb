@@ -10,15 +10,14 @@ Main func: use Scaffold-GS as the  backnone
 
 namespace GaussianSplatting{
 
-class AnchorOptimizer
+class RenderOptimizer
 {
 
 public:
     // Constructer
-    AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
-                    torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, 
-                    torch::Tensor AnchorRotations, torch::Tensor AnchorOffsets,
-                    ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::ColorMLP ColorNet,
+    RenderOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
+                    torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, torch::Tensor AnchorOffsets,
+                    ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::FreqColorMLP ColorNet,
                     const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
                     std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
     void TrainingSetup();
@@ -29,28 +28,22 @@ protected:
     void SetProjMatrix();
 
     // Filters
-    void PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelIndices);
-    void GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelIndices, 
+    void GenerateNeuralGaussian(const torch::Tensor CamCenter, 
                                 torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
                                 torch::Tensor& GauScale, torch::Tensor& GauRot,
                                 torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauIndices);
 
     // Densification and prune
-    // void AddDensificationStats(torch::Tensor& viewspace_point_tensor, torch::Tensor& update_filter);
-    void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices, const torch::Tensor VisibleVoxelIndices);
+    void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices);
     void DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh);
     void DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm);
     void PruneAnchors(torch::Tensor mask);
 
     void DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, 
-                              torch::Tensor& NewAnchorOffsets, torch::Tensor& NewAnchorRotations, torch::Tensor& NewAnchorScales);
+                              torch::Tensor& NewAnchorOffsets, torch::Tensor& NewAnchorScales);
     void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
     void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
 
-    // void PruneAnchors(torch::Tensor mask);
-    // void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
-    // void ResetOpacity();
-    
     // Learning rate updater
     void UpdateLR(const float iteration);
 
@@ -71,7 +64,7 @@ protected:
 
 protected:
     // 1. Setting
-    ORB_SLAM3::ScaffoldOptimizationParams mOptimizationParams;
+    ORB_SLAM3::RenderOptimizationParams mOptimizationParams;
 
     struct mModelParams
     {
@@ -86,7 +79,7 @@ protected:
     float mVoxelSize = 0.01;
 
     // 1.2 Densify and Prune settings
-    int mHierachyLayerNum = 3;
+    int mHierachyLayerNum = 1;
     int mHierachyFVoxelSizeFactor = 4;
 
 
@@ -95,12 +88,11 @@ protected:
     torch::Tensor mAchorFeatures;       // [mSizeofAnchors, 32]
     torch::Tensor mAchorScales;         // [mSizeofAnchors, 3]
     torch::Tensor mOffsets;             // [mSizeofAnchors, mSizeofOffsets, 3]
-    torch::Tensor mAchorRotations;      // [mSizeofAnchors, 4] in func PrefilterVoxel
 
     ORB_SLAM3::FeatureBankMLP mFeatureMLP;                  // [input_dim, output_dim] = [3+1, mFeatureDim]
     ORB_SLAM3::OpacityMLP mOpacityMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
     ORB_SLAM3::CovarianceMLP mCovarianceMLP;                // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
-    ORB_SLAM3::ColorMLP mColorMLP;                          // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
+    ORB_SLAM3::FreqColorMLP mColorMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
     struct mAppearanceEmbedding : torch::nn::Module { };    // [input_dim, output_dim] = [mSizeofCameras, mAppearanceDim]
 
     // 3. Anchor mangement members
@@ -134,11 +126,6 @@ protected:
     
     // 6. Traning and loss members
     std::unique_ptr<torch::optim::Adam> mOptimizer;
-    // std::unique_ptr<torch::optim::Adam> mAttributesOptimizer;
-    // std::unique_ptr<torch::optim::Adam> mFeatureBankMLPOptimizer;
-    // std::unique_ptr<torch::optim::Adam> mOpacityMLPOptimizer;
-    // std::unique_ptr<torch::optim::Adam> mCovarianceMLPOptimizer;
-    // std::unique_ptr<torch::optim::Adam> mColorMLPOptimizer;
 
     ORB_SLAM3::ExponLRFunc mAnchorSchedulerArgs;
     ORB_SLAM3::ExponLRFunc mOffsetSchedulerArgs;

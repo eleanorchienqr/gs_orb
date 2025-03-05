@@ -1,4 +1,4 @@
-#include "Renderer/AnchorOptimizer.h"
+#include "Renderer/RenderOptimizer.h"
 #include "Renderer/Rasterizer.h"
 
 #include <Thirdparty/simple-knn/spatial.h>
@@ -8,14 +8,13 @@
 
 namespace GaussianSplatting{
     
-AnchorOptimizer::AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
-                torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, 
-                torch::Tensor AnchorRotations, torch::Tensor AnchorOffsets,
-                ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::ColorMLP ColorNet,
+RenderOptimizer::RenderOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
+                torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, torch::Tensor AnchorOffsets,
+                ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::FreqColorMLP ColorNet,
                 const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
                 std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages):
                 mSizeofAnchors(SizeofInitAnchors), mFeatureDim(AnchorFeatureDim), mSizeofOffsets(AnchorSizeofOffsets), mSizeofCameras(CamNum),
-                mAchorPos(AnchorWorldPos), mAchorFeatures(AnchorFeatures), mAchorScales(AnchorScales), mAchorRotations(AnchorRotations), mOffsets(AnchorOffsets),
+                mAchorPos(AnchorWorldPos), mAchorFeatures(AnchorFeatures), mAchorScales(AnchorScales), mOffsets(AnchorOffsets),
                 mFeatureMLP(FBNet),mOpacityMLP(OpacityNet), mCovarianceMLP(CovNet), mColorMLP(ColorNet),
                 mImHeight(ImHeight), mImWidth(ImWidth), mTanFovx(TanFovx), mTanFovy(TanFovy), 
                 mViewMatrices(ViewMatrices), mTrainedImages(TrainedImages)
@@ -50,7 +49,7 @@ AnchorOptimizer::AnchorOptimizer(int SizeofInitAnchors, const int AnchorFeatureD
                     mAnchorDenom = torch::zeros({mSizeofAnchors, 1}, torch::dtype(torch::kInt32)).to(torch::kCUDA);                              // [mSizeofAnchors, 1]
                 }
 
-void AnchorOptimizer::TrainingSetup()
+void RenderOptimizer::TrainingSetup()
 {
     // Scheduler setting
     mAnchorSchedulerArgs = ORB_SLAM3::ExponLRFunc(mOptimizationParams.AnchorLRInit * mOptimizationParams.SpatialLRScale,
@@ -83,7 +82,6 @@ void AnchorOptimizer::TrainingSetup()
     mOffsets.set_requires_grad(true);
     mAchorFeatures.set_requires_grad(true);
     mAchorScales.set_requires_grad(true);
-    mAchorRotations.set_requires_grad(true);
 
     // Optimizer setting
     std::vector<torch::optim::OptimizerParamGroup> OptimizerParamsGroups;
@@ -93,7 +91,6 @@ void AnchorOptimizer::TrainingSetup()
     OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mOffsets}, std::make_unique<torch::optim::AdamOptions>(mOptimizationParams.OffsetLRInit * mOptimizationParams.SpatialLRScale)));
     OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mAchorFeatures}, std::make_unique<torch::optim::AdamOptions>(mOptimizationParams.FeatureLR)));
     OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mAchorScales}, std::make_unique<torch::optim::AdamOptions>(mOptimizationParams.ScalingLR)));
-    OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mAchorRotations}, std::make_unique<torch::optim::AdamOptions>(mOptimizationParams.RotationLR)));
 
     OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mFeatureMLP.parameters()}, std::make_unique<torch::optim::AdamOptions>(mOptimizationParams.FeatureBankMLPLRInit)));
     OptimizerParamsGroups.push_back(torch::optim::OptimizerParamGroup({mOpacityMLP.parameters()}, std::make_unique<torch::optim::AdamOptions>(mOptimizationParams.OpacityMLPLRInit)));
@@ -104,17 +101,16 @@ void AnchorOptimizer::TrainingSetup()
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[1].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[2].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[3].options()).eps(1e-15);
-    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[4].options()).eps(1e-15);
 
+    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[4].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[5].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[6].options()).eps(1e-15);
     static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[7].options()).eps(1e-15);
-    static_cast<torch::optim::AdamOptions&>(OptimizerParamsGroups[8].options()).eps(1e-15);
 
     mOptimizer = std::make_unique<torch::optim::Adam>(OptimizerParamsGroups, torch::optim::AdamOptions(0.f).eps(1e-15));  
 }
 
-void AnchorOptimizer::Optimize()
+void RenderOptimizer::Optimize()
 {
     // Version 1: use ini KeyFrame as 
     torch::Tensor ViewMatrix = mViewMatrices[0];
@@ -123,24 +119,19 @@ void AnchorOptimizer::Optimize()
     torch::Tensor GTImg = mTrainedImagesTensor[0];
 
     // Important variables
-    torch::Tensor VisibleVoxelIndices = torch::Tensor();
-    torch::Tensor NeuralOpacity = torch::Tensor(); // After VisibleVoxelMask Before NeuralGauMask
+    torch::Tensor NeuralOpacity = torch::Tensor(); // Before NeuralGauMask
     torch::Tensor NeuralGauIndices = torch::Tensor(); 
 
-    torch::Tensor GauPos = torch::Tensor();        // After VisibleVoxelMask + NeuralGauMask
-    torch::Tensor GauColor = torch::Tensor();      // After VisibleVoxelMask + NeuralGauMask
-    torch::Tensor GauOpacity = torch::Tensor();    // After VisibleVoxelMask + NeuralGauMask
-    torch::Tensor GauScale = torch::Tensor();      // After VisibleVoxelMask + NeuralGauMask
-    torch::Tensor GauRot = torch::Tensor();        // After VisibleVoxelMask + NeuralGauMask
+    torch::Tensor GauPos = torch::Tensor();        // After NeuralGauMask
+    torch::Tensor GauColor = torch::Tensor();      // After NeuralGauMask
+    torch::Tensor GauOpacity = torch::Tensor();    // After NeuralGauMask
+    torch::Tensor GauScale = torch::Tensor();      // After NeuralGauMask
+    torch::Tensor GauRot = torch::Tensor();        // After NeuralGauMask
 
     for (int iter = 1; iter < mOptimizationParams.Iter + 1; ++iter) 
     {
-        // Filter anchors in the Frustum VisibleVoxelMask [AnchorNum]
-        PrefilterVoxel(ViewMatrix, ProjMatrix, CamCenter, VisibleVoxelIndices);
-
         // Neural Gaussian derivation
-        GenerateNeuralGaussian(CamCenter, VisibleVoxelIndices, 
-            GauPos, GauColor, GauOpacity, GauScale, GauRot, NeuralOpacity, NeuralGauIndices);
+        GenerateNeuralGaussian(CamCenter, GauPos, GauColor, GauOpacity, GauScale, GauRot, NeuralOpacity, NeuralGauIndices);
 
         // Rasterization
         torch::Tensor Cov3DPrecomp = torch::Tensor();
@@ -175,14 +166,14 @@ void AnchorOptimizer::Optimize()
             torch::NoGradGuard no_grad;
 
             cv::Mat RenderImg = TensorToCVMat(rendererd_image);
-            cv::imwrite("Scaffold_InitialImage.png", RenderImg);
-            // std::cout << "[AnchorOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image.index({"...", 0, "..."}) << std::endl;
+            cv::imwrite("Render_InitialImage.png", RenderImg);
+            // std::cout << "[RenderOptimizer::OptimizeMonoGS] Debug;RenderImg: " << rendererd_image.index({"...", 0, "..."}) << std::endl;
 
             cv::Mat TrianedImg = TensorToCVMat(GTImg);
-            cv::imwrite("Scaffold_InitialTrainedImage.png", TrianedImg);
+            cv::imwrite("Render_InitialTrainedImage.png", TrianedImg);
 
             float psnr = PSNR(rendererd_image, GTImg);
-            std::cout << "[AnchorOptimizer] Debug;psnr: " << psnr << std::endl;
+            std::cout << "[RenderOptimizer] Debug;psnr: " << psnr << std::endl;
         }
 
         // Loss and backward
@@ -194,7 +185,7 @@ void AnchorOptimizer::Optimize()
             torch::NoGradGuard no_grad;
             if (iter > mOptimizationParams.StartStatistic && iter < mOptimizationParams.UpdateUntil)
             {
-                AddDensificationStats(Means2D, radii, NeuralOpacity, NeuralGauIndices, VisibleVoxelIndices);
+                AddDensificationStats(Means2D, radii, NeuralOpacity, NeuralGauIndices);
                 if (iter > mOptimizationParams.UpdateFrom && iter % mOptimizationParams.UpdateInterval == 0)
                     DensifyAndPrune(1, 0.005, 0.8, 0.0002);
             }
@@ -208,47 +199,13 @@ void AnchorOptimizer::Optimize()
         }
     }
 
-    std::cout << "[>>>AnchorOptimization] All Anchor Nums after first optimization " << mSizeofAnchors << std::endl;
+    std::cout << "[>>>RenderOptimization] All Anchor Nums after first optimization " << mSizeofAnchors << std::endl;
     PrintCUDAUse();
 
 }
 
 // Filters
-void AnchorOptimizer::PrefilterVoxel(const torch::Tensor ViewMatrix, const torch::Tensor ProjMatrix, const torch::Tensor CamCenter, torch::Tensor& VisibleVoxelIndices)
-{
-
-    // Note: no gradient
-    // Important variables
-    torch::Tensor Cov3DPrecomp = torch::Tensor();
-    
-    // Set up rasterization configuration
-    GaussianRasterizationSettings raster_settings = {
-        .image_height = static_cast<int>(mImHeight),
-        .image_width = static_cast<int>(mImWidth),
-        .tanfovx = mTanFovx,
-        .tanfovy = mTanFovy,
-        .bg = mBackground,
-        .scale_modifier = mScaleModifier,
-        .viewmatrix = ViewMatrix,
-        .projmatrix = ProjMatrix,
-        .sh_degree = 1,
-        .camera_center = CamCenter,
-        .prefiltered = false};
-    
-    GaussianRasterizer rasterizer = GaussianRasterizer(raster_settings);
-    torch::cuda::synchronize();
-
-    torch::Tensor radii = rasterizer.visible_filter(
-        mAchorPos, 
-        torch::exp(mAchorScales).to(torch::kCUDA), 
-        torch::nn::functional::normalize(mAchorRotations).to(torch::kCUDA),
-        Cov3DPrecomp);
-
-    torch::Tensor VisibleVoxelMask = radii > 0;
-    VisibleVoxelIndices = torch::nonzero(VisibleVoxelMask == true).squeeze(-1);
-}
-
-void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, const torch::Tensor VisibleVoxelIndices, 
+void RenderOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, 
                                              torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
                                              torch::Tensor& GauScale, torch::Tensor& GauRot,
                                              torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauIndices)
@@ -256,28 +213,28 @@ void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, cons
     using Slice = torch::indexing::Slice;
 
     // 1. Filter [mAchorPos, mAchorFeatures, mOffsets, mAchorScales]
-    torch::Tensor AchorPos = mAchorPos.index_select(0, VisibleVoxelIndices);
-    torch::Tensor AchorFeatures = mAchorFeatures.index_select(0, VisibleVoxelIndices);
-    torch::Tensor Offsets = mOffsets.index_select(0, VisibleVoxelIndices);
-    torch::Tensor AchorScales = mAchorScales.index_select(0, VisibleVoxelIndices);
+    torch::Tensor AchorPos = mAchorPos;
+    torch::Tensor AchorFeatures = mAchorFeatures;
+    torch::Tensor Offsets = mOffsets;
+    torch::Tensor AchorScales = mAchorScales;
 
     // 2. Get Cam-Anchor direction and distance [CamAnchorView, CamAnchorDist]
-    torch::Tensor CamCenterBroadcast = CamCenter.unsqueeze(0).repeat({AchorPos.size(0), 1}); // [3] -> [VisibleAnchorNum, 3]
-    torch::Tensor CamAnchorDir = AchorPos - CamCenterBroadcast;                              // [VisibleAnchorNum, 3]
-    torch::Tensor CamAnchorDist = CamAnchorDir.norm(-1, true).unsqueeze(-1);                 // [VisibleAnchorNum, 1]
-    torch::Tensor CamAnchorView = CamAnchorDir / CamAnchorDist.repeat({1, 3});               // [VisibleAnchorNum, 3]
+    torch::Tensor CamCenterBroadcast = CamCenter.unsqueeze(0).repeat({AchorPos.size(0), 1}); // [3] -> [mSizeofAnchors, 3]
+    torch::Tensor CamAnchorDir = AchorPos - CamCenterBroadcast;                              // [mSizeofAnchors, 3]
+    torch::Tensor CamAnchorDist = CamAnchorDir.norm(-1, true).unsqueeze(-1);                 // [mSizeofAnchors, 1]
+    torch::Tensor CamAnchorView = CamAnchorDir / CamAnchorDist.repeat({1, 3});               // [mSizeofAnchors, 3]
 
     // 3. Get weighted Feature through mFeatureMLP [Index refers to https://pytorch.org/cppdocs/notes/tensor_indexing.html]
-    torch::Tensor FeatureMLPInput = torch::cat({CamAnchorView, CamAnchorDist}, -1);                     // [VisibleAnchorNum, 4] on GPU
-    torch::Tensor FeatureWeight = mFeatureMLP.forward(FeatureMLPInput).unsqueeze(1).repeat({1,32,1});   // [VisibleAnchorNum, mFeatureDim, 3] on GPU
+    torch::Tensor FeatureMLPInput = torch::cat({CamAnchorView, CamAnchorDist}, -1);                     // [mSizeofAnchors, 4] on GPU
+    torch::Tensor FeatureWeight = mFeatureMLP.forward(FeatureMLPInput).unsqueeze(1).repeat({1,32,1});   // [mSizeofAnchors, mFeatureDim, 3] on GPU
     AchorFeatures = AchorFeatures.index({Slice(), Slice(torch::indexing::None, torch::indexing::None, 4)}).repeat({1,4}) * FeatureWeight.index({Slice(), Slice(), 0}) \
         + AchorFeatures.index({Slice(), Slice(torch::indexing::None, torch::indexing::None, 2)}).repeat({1,2}) * FeatureWeight.index({Slice(), Slice(), 1}) \
-        + AchorFeatures * FeatureWeight.index({Slice(), Slice(), 2});                                  // [VisibleAnchorNum, 32] on GPU
+        + AchorFeatures * FeatureWeight.index({Slice(), Slice(), 2});                                  // [mSizeofAnchors, 32] on GPU
     
     // 4. Get Neural Opacity and Mask
-    torch::Tensor RestMLPInput = torch::cat({AchorFeatures, CamAnchorView}, -1);    // [VisibleAnchorNum, mFeatureDim+3] on GPU
-    NeuralOpacity = mOpacityMLP.forward(RestMLPInput);                              // [VisibleAnchorNum, mSizeofOffsets] on GPU
-    NeuralOpacity = NeuralOpacity.view({-1});                                       // [VisibleAnchorNum * mSizeofOffsets] on GPU
+    torch::Tensor RestMLPInput = torch::cat({AchorFeatures, CamAnchorView}, -1);    // [mSizeofAnchors, mFeatureDim+3] on GPU
+    NeuralOpacity = mOpacityMLP.forward(RestMLPInput);                              // [mSizeofAnchors, mSizeofOffsets] on GPU
+    NeuralOpacity = NeuralOpacity.view({-1});                                       // [mSizeofAnchors * mSizeofOffsets] on GPU
     NeuralGauIndices = torch::nonzero(NeuralOpacity > 0.f = true).squeeze(-1);      // [GauNum]
     GauOpacity = NeuralOpacity.index_select(0, NeuralGauIndices).unsqueeze(-1);     // [GauNum, 1]
 
@@ -300,29 +257,25 @@ void AnchorOptimizer::GenerateNeuralGaussian(const torch::Tensor CamCenter, cons
 }
 
 // Densification
-void AnchorOptimizer::AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices, const torch::Tensor VisibleVoxelIndices)
+void RenderOptimizer::AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices)
 {
     // Update mOpacityAccum [mSizeofAnchors, 1] from NeuralOpacity [AnchorNum * mSizeofOffsets]
-    torch::Tensor TempOpacity = NeuralOpacity.clone().view({-1}).detach();              // [VisibleAnchorNum * mSizeofOffsets] on GPU
+    torch::Tensor TempOpacity = NeuralOpacity.clone().view({-1}).detach();              // [mSizeofAnchors * mSizeofOffsets] on GPU
     torch::Tensor OpacityMaskIndices = torch::nonzero(TempOpacity < 0.f).squeeze(-1);   // [IndicesNum]
     TempOpacity.index_put_({OpacityMaskIndices}, 0);
-    TempOpacity = TempOpacity.view({-1, mSizeofOffsets});                               // [VisibleAnchorNum, mSizeofOffsets] on GPU
+    TempOpacity = TempOpacity.view({-1, mSizeofOffsets});                               // [mSizeofAnchors, mSizeofOffsets] on GPU
 
-    mOpacityAccum.index_put_({VisibleVoxelIndices}, mOpacityAccum.index_select(0, VisibleVoxelIndices) + TempOpacity.sum(1, true));
+    mOpacityAccum = mOpacityAccum + TempOpacity.sum(1, true);
     
     // Update mAnchorDenom [mSizeofAnchors, 1]
-    mAnchorDenom.index_put_({VisibleVoxelIndices}, mAnchorDenom.index_select(0, VisibleVoxelIndices) + 1);
+    mAnchorDenom = mAnchorDenom + 1;
 
     // Update mOffsetGradientAccum , mOffsetDenom [mSizeofAnchors*mSizeofOffsets, 1]
-    torch::Tensor VisibleVoxelMask = torch::zeros({mSizeofAnchors}, torch::dtype(torch::kBool)).to(torch::kCUDA);
-    VisibleVoxelMask.index_put_({VisibleVoxelIndices}, true);
-    VisibleVoxelMask = VisibleVoxelMask.unsqueeze(1).repeat({1, mSizeofOffsets}).view({-1});    // [mSizeofAnchors*mSizeofOffsets] -> [VisibleAnchorNum*mSizeofOffsets] is true
-
     torch::Tensor NeuralGausMask = torch::zeros({NeuralOpacity.size(0)}, torch::dtype(torch::kBool)).to(torch::kCUDA);
-    NeuralGausMask.index_put_({NeuralGauIndices}, true);                                        // [VisibleAnchorNum*mSizeofOffsets]
+    NeuralGausMask.index_put_({NeuralGauIndices}, true);                                        // [mSizeofAnchors*mSizeofOffsets]
 
     torch::Tensor IntegratedMask = torch::zeros({mSizeofAnchors * mSizeofOffsets}, torch::dtype(torch::kBool)).to(torch::kCUDA);
-    IntegratedMask.index_put_({VisibleVoxelMask}, NeuralGausMask);                              // [mSizeofAnchors*mSizeofOffsets] 
+    IntegratedMask = NeuralGausMask;
 
     torch::Tensor VisibilityFilter = radii > 0.f;                                               // [GauNum] 
     
@@ -334,7 +287,7 @@ void AnchorOptimizer::AddDensificationStats(const torch::Tensor Means2D, const t
     mOffsetDenom.index_put_({IntegratedMask}, mOffsetDenom.index_select(0, IntegratedMask.nonzero().squeeze()) + 1); 
 }
 
-void AnchorOptimizer::DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh) 
+void RenderOptimizer::DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh) 
 {
     // 1. Compute gradient norm and offset denom mask
     torch::Tensor OffsetGrads = mOffsetGradientAccum / mOffsetDenom;    // [mSizeofAnchors*mSizeofOffsets, 1]
@@ -356,7 +309,7 @@ void AnchorOptimizer::DensifyAndPrune(const int UpdateInterval, const float MinO
     PruneAnchors(PruneMask);
 }
 
-void AnchorOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm)
+void RenderOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm)
 {
     // Densify anchors through different resolutions
     const int OriginalAnchorNum = mAchorPos.size(0);                              //! mAchorPos sze increased through each following cycle
@@ -391,14 +344,11 @@ void AnchorOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Ten
 
         torch::Tensor NewAnchorFeatures  = torch::zeros({NewAnchorNum, mFeatureDim}, torch::dtype(torch::kFloat)).to(torch::kCUDA);       // [NewAnchorNum, AnchorFeatureDim]
         torch::Tensor NewAnchorOffsets  = torch::zeros({NewAnchorNum, mSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [NewAnchorNum, AnchorSizeofOffsets, 3]
-        torch::Tensor NewAnchorRotations  = torch::zeros({NewAnchorNum, 4}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                               // [NewAnchorNum, 4]
         torch::Tensor NewAnchorScales  = torch::log(torch::ones({NewAnchorNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA) * CurrentVoxelSize);    // [NewAnchorNum, 3]
         
         NewAnchorFeatures = mAchorFeatures.unsqueeze(1).repeat({1, mSizeofOffsets, 1}).view({-1, mFeatureDim}).index_select(0, CandidateAnchorMask.nonzero().squeeze(-1));
-        NewAnchorRotations.index_put_({torch::indexing::Slice(), 0}, 1.f);
-
         // Update Optimizer
-        DensificationPostfix(NewAnchorPos, NewAnchorFeatures, NewAnchorOffsets, NewAnchorRotations, NewAnchorScales); 
+        DensificationPostfix(NewAnchorPos, NewAnchorFeatures, NewAnchorOffsets, NewAnchorScales); 
 
         // Update Anchor denom and opacity sccumulation
         mSizeofAnchors += NewAnchorNum;
@@ -418,18 +368,15 @@ void AnchorOptimizer::DensifyAnchors(const float DensifyGradTh, const torch::Ten
     mOffsetGradientAccum = torch::cat({mOffsetGradientAccum, NewOffetGradientAccum}, 0);    // [mSizeofAnchors*mSizeofOffsets, 1]
 }
 
-void AnchorOptimizer::DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, torch::Tensor& NewAnchorOffsets,
-                                           torch::Tensor& NewAnchorRotations, torch::Tensor& NewAnchorScales) 
+void RenderOptimizer::DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, torch::Tensor& NewAnchorOffsets, torch::Tensor& NewAnchorScales) 
 {
     CatTensorstoOptimizer(NewAnchorPos, mAchorPos, 0);
     CatTensorstoOptimizer(NewAnchorOffsets, mOffsets, 1);
     CatTensorstoOptimizer(NewAnchorFeatures, mAchorFeatures, 2);
     CatTensorstoOptimizer(NewAnchorScales, mAchorScales, 3);
-    // CatTensorstoOptimizer(NewAnchorRotations, mAchorRotations, 4);
-    mAchorRotations = torch::cat({mAchorRotations, NewAnchorRotations}, 0); // Optimizer error
 }
 
-void AnchorOptimizer::CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position) 
+void RenderOptimizer::CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position) 
 {
     auto adamParamStates = std::make_unique<torch::optim::AdamParamState>(static_cast<torch::optim::AdamParamState&>(
         *mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()]));
@@ -445,7 +392,7 @@ void AnchorOptimizer::CatTensorstoOptimizer(torch::Tensor& extension_tensor, tor
     mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
 }
 
-void AnchorOptimizer::PruneAnchors(torch::Tensor mask)
+void RenderOptimizer::PruneAnchors(torch::Tensor mask)
 {
     torch::Tensor ValidAnchorMask = ~mask; 
     int TrueCount = ValidAnchorMask.sum().item<int>();
@@ -457,8 +404,6 @@ void AnchorOptimizer::PruneAnchors(torch::Tensor mask)
     PruneOptimizer(mOffsets, indices, 1);
     PruneOptimizer(mAchorFeatures, indices, 2);
     PruneOptimizer(mAchorScales, indices, 3);
-    // PruneOptimizer(mAchorRotations, indices, 4);
-    mAchorRotations = mAchorRotations.index_select(0, indices);
 
     // Update Anchor and offset members
     mSizeofAnchors = TrueCount;
@@ -472,7 +417,7 @@ void AnchorOptimizer::PruneAnchors(torch::Tensor mask)
     //     self.anchor_demon[anchors_mask] = torch.zeros([anchors_mask.sum(), 1], device='cuda').float(
 }
 
-void AnchorOptimizer::PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position)
+void RenderOptimizer::PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position)
 {
     auto adamParamStates = std::make_unique<torch::optim::AdamParamState>(static_cast<torch::optim::AdamParamState&>(
         *mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] ));
@@ -486,7 +431,7 @@ void AnchorOptimizer::PruneOptimizer(torch::Tensor& old_tensor, const torch::Ten
     mOptimizer->state()[mOptimizer->param_groups()[param_position].params()[0].unsafeGetTensorImpl()] = std::move(adamParamStates);
 }
 
-void AnchorOptimizer::UpdateLR(const float iteration)
+void RenderOptimizer::UpdateLR(const float iteration)
 {
     // TODO Learning rate update check 
     // This is hacky because you cant change in libtorch individual parameter learning rate
@@ -503,14 +448,14 @@ void AnchorOptimizer::UpdateLR(const float iteration)
     static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[0].options()).set_lr(AchorPosLR);
     static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[1].options()).set_lr(OffsetLR);
 
-    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[5].options()).set_lr(FeatureBankMLPLR);
-    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[6].options()).set_lr(OpacityMLPLR);
-    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[7].options()).set_lr(CovarianceMLPLR);
-    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[8].options()).set_lr(ColorMLPLR);
+    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[4].options()).set_lr(FeatureBankMLPLR);
+    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[5].options()).set_lr(OpacityMLPLR);
+    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[6].options()).set_lr(CovarianceMLPLR);
+    static_cast<torch::optim::AdamOptions&>(mOptimizer->param_groups()[7].options()).set_lr(ColorMLPLR);
 }
 
 // Utils func
-void AnchorOptimizer::SetProjMatrix()
+void RenderOptimizer::SetProjMatrix()
 {
     float top = mTanFovy * mNear;
     float bottom = -top;
@@ -534,7 +479,7 @@ void AnchorOptimizer::SetProjMatrix()
 }
 
 
-void AnchorOptimizer::PrintCUDAUse( )
+void RenderOptimizer::PrintCUDAUse( )
 {
     size_t free_byte;
     size_t total_byte;
@@ -553,13 +498,13 @@ void AnchorOptimizer::PrintCUDAUse( )
 }
 
 // Loss
-torch::Tensor AnchorOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) 
+torch::Tensor RenderOptimizer::L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt) 
 {
     return torch::abs((network_output - gt)).mean();
 }
 
 //Utils
-cv::Mat AnchorOptimizer::TensorToCVMat(torch::Tensor tensor)
+cv::Mat RenderOptimizer::TensorToCVMat(torch::Tensor tensor)
 {
     torch::Tensor detached_tensor = tensor.detach().clamp(0.f, 1.f) * 255;
     detached_tensor = detached_tensor.to(torch::kUInt8);
@@ -572,7 +517,7 @@ cv::Mat AnchorOptimizer::TensorToCVMat(torch::Tensor tensor)
     return mat.clone();
 }
 
-float AnchorOptimizer::PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img) {
+float RenderOptimizer::PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img) {
     torch::Tensor squared_diff = (rendered_img - gt_img).pow(2);
     torch::Tensor mse_val = squared_diff.view({rendered_img.size(0), -1}).mean(1, true);
     return (20.f * torch::log10(1.0 / mse_val.sqrt())).mean().item<float>();

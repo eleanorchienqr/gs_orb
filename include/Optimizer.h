@@ -113,6 +113,9 @@ public:
     // Anchor Optimization
     void static GlobalAchorInitOptimization(Map* pMap);
 
+    // Render Optimization (Test contribution)
+    void static InitialRenderOptimization(Map* pMap)
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
 protected:

@@ -2927,9 +2927,21 @@ void Tracking::CreateInitialMapMonocular()
     #ifdef GAUSSIANSPLATTING
     // Optimizer::GlobalGaussianOptimization(mpAtlas->GetCurrentMap(),200, true);
     // Optimizer::GlobalGaussianOptimizationMonoGS(pKFini);
-    Optimizer::GlobalAchorInitOptimization(mpAtlas->GetCurrentMap()); // Anchor optimization test func
+    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+    Optimizer::InitialRenderOptimization(mpAtlas->GetCurrentMap()); // Scaffold-GS optimization version
+    std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+    Optimizer::GlobalAchorInitOptimization(mpAtlas->GetCurrentMap()); // Scaffold-GS optimization version
+    std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
+    Optimizer::GlobalGaussianOptimizationInitFrame(pKFini);           // Gaussian splatting optimization version
+    std::chrono::steady_clock::time_point t4 = std::chrono::steady_clock::now();
 
-    Optimizer::GlobalGaussianOptimizationInitFrame(pKFini); // latest version
+    double RendeTime = std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+    double AnchorTime= std::chrono::duration_cast<std::chrono::duration<double> >(t3 - t2).count();
+    double GauTime= std::chrono::duration_cast<std::chrono::duration<double> >(t4 - t3).count();
+
+    std::cout << "[Optimizer Time Comparision] InitialRenderOptimization: " << RendeTime << " s" << std::endl;
+    std::cout << "[Optimizer Time Comparision] GlobalAchorInitOptimization: " << AnchorTime  << " s" << std::endl;
+    std::cout << "[Optimizer Time Comparision] GlobalGaussianOptimizationInitFrame: " << GauTime  << " s" << std::endl;
     // Optimizer::GlobalGaussianOptimization(pKFini);
     #endif
 
