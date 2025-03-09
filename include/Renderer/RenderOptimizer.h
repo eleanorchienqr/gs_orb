@@ -15,91 +15,89 @@ class RenderOptimizer
 
 public:
     // Constructer
-    RenderOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
-                    torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, torch::Tensor AnchorOffsets,
-                    ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::FreqColorMLP ColorNet,
-                    const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
-                    std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
-    void TrainingSetup();
-    void Optimize();
+    // RenderOptimizer(int SizeofInitAnchors, const int AnchorFeatureDim, const int AnchorSizeofOffsets, const int CamNum, 
+    //                 torch::Tensor AnchorWorldPos, torch::Tensor AnchorFeatures, torch::Tensor AnchorScales, torch::Tensor AnchorOffsets,
+    //                 ORB_SLAM3::FeatureBankMLP FBNet, ORB_SLAM3::OpacityMLP OpacityNet, ORB_SLAM3::CovarianceMLP CovNet, ORB_SLAM3::FreqColorMLP ColorNet,
+    //                 const int ImHeight, const int ImWidth, const float TanFovx, const float TanFovy,
+    //                 std::vector<torch::Tensor> ViewMatrices, std::vector<cv::Mat> TrainedImages);
+    // void TrainingSetup();
+    // void Optimize();
 
 protected:
     // Setters
-    void SetProjMatrix();
+    // void SetProjMatrix();
 
     // Filters
-    void GenerateNeuralGaussian(const torch::Tensor CamCenter, 
-                                torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
-                                torch::Tensor& GauScale, torch::Tensor& GauRot,
-                                torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauIndices);
+    // void GenerateNeuralGaussian(const torch::Tensor CamCenter, 
+    //                             torch::Tensor& GauPos, torch::Tensor& GauColor, torch::Tensor& GauOpacity, 
+    //                             torch::Tensor& GauScale, torch::Tensor& GauRot,
+    //                             torch::Tensor& NeuralOpacity, torch::Tensor& NeuralGauIndices);
 
     // Densification and prune
-    void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices);
-    void DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh);
-    void DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm);
-    void PruneAnchors(torch::Tensor mask);
+    // void AddDensificationStats(const torch::Tensor Means2D, const torch::Tensor radii, const torch::Tensor NeuralOpacity, const torch::Tensor NeuralGauIndices);
+    // void DensifyAndPrune(const int UpdateInterval, const float MinOpacity, const float SuccessTh, const float DensifyGradTh);
+    // void DensifyAnchors(const float DensifyGradTh, const torch::Tensor OffsetDenomMask, const torch::Tensor OffsetGradNorm);
+    // void PruneAnchors(torch::Tensor mask);
 
-    void DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, 
-                              torch::Tensor& NewAnchorOffsets, torch::Tensor& NewAnchorScales);
-    void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
-    void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
+    // void DensificationPostfix(torch::Tensor& NewAnchorPos, torch::Tensor& NewAnchorFeatures, 
+    //                           torch::Tensor& NewAnchorOffsets, torch::Tensor& NewAnchorScales);
+    // void CatTensorstoOptimizer(torch::Tensor& extension_tensor, torch::Tensor& old_tensor, int param_position);
+    // void PruneOptimizer(torch::Tensor& old_tensor, const torch::Tensor& mask, int param_position);
 
     // Learning rate updater
-    void UpdateLR(const float iteration);
+    // void UpdateLR(const float iteration);
 
     // Loss
-    torch::Tensor L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt);
+    // torch::Tensor L1Loss(const torch::Tensor& network_output, const torch::Tensor& gt);
 
     // Utils
-    inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
-    cv::Mat TensorToCVMat(torch::Tensor tensor);
-    float PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img);
+    // inline torch::Tensor InverseSigmoid(torch::Tensor x) {return torch::log(x / (1 - x));}
+    // cv::Mat TensorToCVMat(torch::Tensor tensor);
+    // float PSNR(const torch::Tensor& rendered_img, const torch::Tensor& gt_img);
+
     // Tree management
     // void UpdateIndiceForestAfterClone(const torch::Tensor indices);
     // void UpdateIndiceForestAfterSplit(const torch::Tensor indices);
     // void UpdateIndiceForestAfterPrune(const torch::Tensor indices);
 
     // Debug
-    static void PrintCUDAUse();
+    // static void PrintCUDAUse();
 
 protected:
     // 1. Setting
     ORB_SLAM3::RenderOptimizationParams mOptimizationParams;
+    ORB_SLAM3::RenderModelParams mRenderModelParams;
 
-    struct mModelParams
-    {
-
-    };
     // 1.1 Basic settings
-    int mSizeofAnchors;
-    int mSizeofOffsets = 5;
-    int mFeatureDim = 32;
-    int mAppearanceDim = 32;
+    // int mSizeofAnchors;
+    // int mSizeofOffsets = 5;
+    // int mFeatureDim = 32;
+    // int mAppearanceDim = 32;
 
-    float mVoxelSize = 0.01;
+    // float mVoxelSize = 0.01;
 
     // 1.2 Densify and Prune settings
-    int mHierachyLayerNum = 1;
-    int mHierachyFVoxelSizeFactor = 4;
+    // int mHierachyLayerNum = 1;
+    // int mHierachyFVoxelSizeFactor = 4;
 
 
     // 2. Learnable members
-    torch::Tensor mAchorPos;            // [mSizeofAnchors, 3]
-    torch::Tensor mAchorFeatures;       // [mSizeofAnchors, 32]
-    torch::Tensor mAchorScales;         // [mSizeofAnchors, 3]
-    torch::Tensor mOffsets;             // [mSizeofAnchors, mSizeofOffsets, 3]
+    // torch::Tensor mAchorPos;            // [mSizeofAnchors, 3]
+    // torch::Tensor mAchorFeatures;       // [mSizeofAnchors, 32]
+    // torch::Tensor mAchorScales;         // [mSizeofAnchors, 3]
+    // torch::Tensor mOffsets;             // [mSizeofAnchors, mSizeofOffsets, 3]
 
-    ORB_SLAM3::FeatureBankMLP mFeatureMLP;                  // [input_dim, output_dim] = [3+1, mFeatureDim]
-    ORB_SLAM3::OpacityMLP mOpacityMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
-    ORB_SLAM3::CovarianceMLP mCovarianceMLP;                // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
-    ORB_SLAM3::FreqColorMLP mColorMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
-    struct mAppearanceEmbedding : torch::nn::Module { };    // [input_dim, output_dim] = [mSizeofCameras, mAppearanceDim]
+    // ORB_SLAM3::FeatureBankMLP mFeatureMLP;                  // [input_dim, output_dim] = [3+1, mFeatureDim]
+    // ORB_SLAM3::OpacityMLP mOpacityMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1, mSizeofOffsets]
+    // ORB_SLAM3::CovarianceMLP mCovarianceMLP;                // [input_dim, output_dim] = [mFeatureDim+3+1, 7*mSizeofOffsets]
+    // ORB_SLAM3::FreqColorMLP mColorMLP;                      // [input_dim, output_dim] = [mFeatureDim+3+1mAppearanceDim, 3*mSizeofOffsets]
+    // struct mAppearanceEmbedding : torch::nn::Module { };    // [input_dim, output_dim] = [mSizeofCameras, mAppearanceDim]
 
     // 3. Anchor mangement members
-    torch::Tensor mOpacityAccum;            // [mSizeofAnchors, 1]
-    torch::Tensor mOffsetGradientAccum;     // [mSizeofAnchors*mSizeofOffsets, 1]
-    torch::Tensor mOffsetDenom;             // [mSizeofAnchors*mSizeofOffsets, 1]
-    torch::Tensor mAnchorDenom;             // [mSizeofAnchors, 1]
+    // torch::Tensor mOpacityAccum;            // [mSizeofAnchors, 1]
+    // torch::Tensor mOffsetGradientAccum;     // [mSizeofAnchors*mSizeofOffsets, 1]
+    // torch::Tensor mOffsetDenom;             // [mSizeofAnchors*mSizeofOffsets, 1]
+    // torch::Tensor mAnchorDenom;             // [mSizeofAnchors, 1]
 
     // 4. Cameras associated members
     int mSizeofCameras, mImHeight, mImWidth;
@@ -110,9 +108,6 @@ protected:
     std::vector<torch::Tensor> mViewMatrices;
     std::vector<torch::Tensor> mProjMatrices;
     std::vector<torch::Tensor> mCameraCenters;
-
-    float mNerfNormRadius;
-    torch::Tensor mNerfNormTranslation;
 
     // 5. Render params
     float mNear = 0.01f;
@@ -127,15 +122,15 @@ protected:
     // 6. Traning and loss members
     std::unique_ptr<torch::optim::Adam> mOptimizer;
 
-    ORB_SLAM3::ExponLRFunc mAnchorSchedulerArgs;
-    ORB_SLAM3::ExponLRFunc mOffsetSchedulerArgs;
-    ORB_SLAM3::ExponLRFunc mFeatureBankMLPSchedulerArgs;
-    ORB_SLAM3::ExponLRFunc mOpacityMLPSchedulerArgs;
-    ORB_SLAM3::ExponLRFunc mCovarianceMLPSchedulerArgs;
-    ORB_SLAM3::ExponLRFunc mColorMLPSchedulerArgs;
+    // ORB_SLAM3::ExponLRFunc mAnchorSchedulerArgs;
+    // ORB_SLAM3::ExponLRFunc mOffsetSchedulerArgs;
+    // ORB_SLAM3::ExponLRFunc mFeatureBankMLPSchedulerArgs;
+    // ORB_SLAM3::ExponLRFunc mOpacityMLPSchedulerArgs;
+    // ORB_SLAM3::ExponLRFunc mCovarianceMLPSchedulerArgs;
+    // ORB_SLAM3::ExponLRFunc mColorMLPSchedulerArgs;
 
     // 7. MapPoint label management
-    std::vector<long> mvpAnchorRootIndex;  
+    // std::vector<long> mvpAnchorRootIndex;  
 
     // Voxel size management
     // torch::Tensor mVoxelSizes;

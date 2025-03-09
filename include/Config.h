@@ -261,12 +261,35 @@ struct RenderOptimizationParams
     float DensifyGradTh = 0.0002;
 };
 
-struct RenderModelnParams
+struct RenderModelParams
 {
+    int SampleNum = 8;
+
+    // Network params
+    int PosEncodeDim = 5;
+
+    int FeatureEncoderLayerNum = 3;
+    int FeatureEncoderHiddenDim = 32;
+    int FeatureDim = 32;
+
+    int FeatureDecoderLayerNum = 3;
+    int FeatureDecoderHiddenDim = 32;
+};
+
+// Render Net Structure
+struct PosEncoding : torch::nn::Module{
 
 };
 
-// MLP structures
+struct FeatureEncoder : torch::nn::Module{
+    
+};
+
+struct FeatureDecoder : torch::nn::Module{
+    
+};
+
+// Scaffold MLP structures
 struct FeatureBankMLP : torch::nn::Module {
     FeatureBankMLP(int64_t InputDim, int64_t OutputDim, int64_t FeatureDim)
     {
@@ -366,14 +389,6 @@ struct FreqColorMLP : torch::nn::Module {
 
     torch::nn::Linear linear1, linear2;
 };
-
-// torch::nn::Sequential version
-// torch::nn::Sequential seq(
-//     torch::nn::Linear(3, 4),
-//     torch::nn::BatchNorm1d(4),
-//     torch::nn::Dropout(0.5)
-// );
-// seq->to(torch::kCUDA);
 
 // Learning rate update func
 struct ExponLRFunc {

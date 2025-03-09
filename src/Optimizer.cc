@@ -6062,86 +6062,90 @@ void Optimizer::InitialRenderOptimization(Map* pMap)
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
 
-    // 1. Get Init Acnhor Num
-    int SizeofInitAnchors = 0;
+    // 1. Get Init Voxel Num
+    int InitGauVoxelNum = 0;
     for(int i = 0; i < vpMP.size(); i++){
         MapPoint* pMP = vpMP[i];
         if(pMP)
-            SizeofInitAnchors += pMP->GetGaussianNum();
+            InitGauVoxelNum += pMP->GetGaussianNum();
     }
-    std::cout << ">>>>>>>[InitialRenderOptimization] The numbers of Init Anchors: " << SizeofInitAnchors << std::endl;
+    std::cout << ">>>>>>>[InitialRenderOptimization] The numbers of Init Gaussian Voxels: " << InitGauVoxelNum << std::endl;
 
     // 2. Initialization Info
-    // 2.1 MapPoint associated members .index_put_({torch::indexing::Slice(), 0}, 1).to(torch::kCUDA, true);
-    int AnchorFeatureDim = 32;
-    int AnchorSizeofOffsets = 5;
-    torch::Tensor AnchorWorldPos  = torch::zeros({SizeofInitAnchors, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                      // [SizeofInitAnchors, 3]
-    torch::Tensor AnchorFeatures  = torch::zeros({SizeofInitAnchors, AnchorFeatureDim}, torch::dtype(torch::kFloat)).to(torch::kCUDA);       // [SizeofInitAnchors, AnchorFeatureDim]
-    torch::Tensor AnchorScales  = torch::zeros({SizeofInitAnchors, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);                        // [SizeofInitAnchors, 1]
-    torch::Tensor AnchorOffsets  = torch::zeros({SizeofInitAnchors, AnchorSizeofOffsets, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [SizeofInitAnchors, AnchorSizeofOffsets, 3]
+    RenderModelParams mRenderModelParams;
 
+    // 2.1 Gaussian Voxels [center, scale]
+    torch::Tensor GaussianVoxel  = torch::zeros({InitGauVoxelNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA);    // [InitGauVoxelNum, 4]
+    
     {
         torch::NoGradGuard no_grad;
-        int GaussianClusterIndex = 0;
-        for(int i = 0; i < vpMP.size(); i++){
+
+        torch::Tensor VoxelCenters  = torch::zeros({InitGauVoxelNum, 3}, torch::dtype(torch::kFloat)).to(torch::kCUDA); // [InitGauVoxelNum, 3]
+        torch::Tensor VoxelScales  = torch::zeros({InitGauVoxelNum, 1}, torch::dtype(torch::kFloat)).to(torch::kCUDA);  // [InitGauVoxelNum, 1]
+
+        int VoxelIndex = 0;
+
+        for(int i = 0; i < vpMP.size(); i++)
+        {
             MapPoint* pMP = vpMP[i];
             if(pMP)
                 if(!pMP->isBad() && pMP->GetGaussianNum())
                 {
-                    int GaussianClusterNum = pMP->GetGaussianNum();
-                    AnchorWorldPos.index_put_({torch::indexing::Slice(GaussianClusterIndex, GaussianClusterIndex + GaussianClusterNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
-                    GaussianClusterIndex += GaussianClusterNum;
-                    // std::cout << "[GlobalGaussianOptimizationInitFrame] Init vpGaussianRootIndex: " << i << std::endl;
-                    
+                    int VoxelNum = pMP->GetGaussianNum();
+                    VoxelCenters.index_put_({torch::indexing::Slice(VoxelIndex, VoxelIndex + VoxelNum), torch::indexing::Slice()},  pMP->GetGauWorldPos());
+                    VoxelIndex += VoxelNum;
                 }
         }
 
-        torch::Tensor dist2 = torch::clamp_min(distCUDA2(AnchorWorldPos), 0.0000001);
-        AnchorScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1).repeat({1, 3});
+        torch::Tensor dist2 = torch::clamp_min(distCUDA2(VoxelCenters), 0.0000001);
+        VoxelScales = torch::log(torch::sqrt(dist2)).unsqueeze(-1);
+
+        GaussianVoxel = torch::cat({VoxelCenters, VoxelScales}, -1);
     }
     
     // 2.2 Atlas associated MLP members [referring to https://pytorch.org/tutorials/advanced/cpp_frontend.html]
-    ORB_SLAM3::FeatureBankMLP FBNet(4, 3, AnchorFeatureDim);                    // [InputDim, OutputDim, FeatureDim]
-    ORB_SLAM3::OpacityMLP OpacityNet(AnchorFeatureDim, AnchorSizeofOffsets);
-    ORB_SLAM3::CovarianceMLP CovNet(AnchorFeatureDim, AnchorSizeofOffsets);
-    // ORB_SLAM3::ColorMLP ColorNet(AnchorFeatureDim, AnchorSizeofOffsets);
-    ORB_SLAM3::FreqColorMLP ColorNet(AnchorFeatureDim, AnchorSizeofOffsets);
+    // ORB_SLAM3::FeatureBankMLP FBNet(4, 3, AnchorFeatureDim);                    // [InputDim, OutputDim, FeatureDim]
+    // ORB_SLAM3::OpacityMLP OpacityNet(AnchorFeatureDim, AnchorSizeofOffsets);
+    // ORB_SLAM3::CovarianceMLP CovNet(AnchorFeatureDim, AnchorSizeofOffsets);
+    // ORB_SLAM3::FreqColorMLP ColorNet(AnchorFeatureDim, AnchorSizeofOffsets);
 
-    FBNet.to(torch::kCUDA);
-    OpacityNet.to(torch::kCUDA);
-    CovNet.to(torch::kCUDA);
-    ColorNet.to(torch::kCUDA);
+    // FBNet.to(torch::kCUDA);
+    // OpacityNet.to(torch::kCUDA);
+    // CovNet.to(torch::kCUDA);
+    // ColorNet.to(torch::kCUDA);
+
+    std::cout << ">>>>>>>[InitialRenderOptimization] Initial Voxel Scales: " << GaussianVoxel << std::endl;
 
     // 3. Get Cam and Img from KFs [CamNum, intrinsics, extrinsics, imgs]
-    int CamNum = vpKFs.size();   
-    int ImHeight, ImWidth;
-    float TanFovx, TanFovy;
-    std::vector<torch::Tensor> ViewMatrices; 
-    std::vector<cv::Mat> TrainedImages;
+    // int CamNum = vpKFs.size();   
+    // int ImHeight, ImWidth;
+    // float TanFovx, TanFovy;
+    // std::vector<torch::Tensor> ViewMatrices; 
+    // std::vector<cv::Mat> TrainedImages;
 
-    CamNum = vpKFs.size();   
-    vpKFs[0]->GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
+    // CamNum = vpKFs.size();   
+    // vpKFs[0]->GetGaussianRenderParams(ImHeight, ImWidth, TanFovx, TanFovy);
 
-    for(size_t i=0; i<vpKFs.size(); i++)
-    {
-        ORB_SLAM3::KeyFrame* pKF = vpKFs[i];
-        if(pKF->isBad())
-            continue;
+    // for(size_t i=0; i<vpKFs.size(); i++)
+    // {ss
+    //     ORB_SLAM3::KeyFrame* pKF = vpKFs[i];
+    //     if(pKF->isBad())
+    //         continue;
 
-        Sophus::SE3f Tcw = pKF->GetPose();
-        torch::Tensor ViewMatrix = Converter::GetViewMatrix(Tcw);
+    //     Sophus::SE3f Tcw = pKF->GetPose();
+    //     torch::Tensor ViewMatrix = Converter::GetViewMatrix(Tcw);
 
-        TrainedImages.push_back(pKF->mImRGB);
-        ViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
-    }
+    //     TrainedImages.push_back(pKF->mImRGB);
+    //     ViewMatrices.push_back(ViewMatrix.to(torch::kCUDA));
+    // }
 
     // 4. Optimization
-    GaussianSplatting::RenderOptimizer optimizer(SizeofInitAnchors, AnchorFeatureDim, AnchorSizeofOffsets, CamNum, 
-                                                AnchorWorldPos, AnchorFeatures, AnchorScales, AnchorOffsets,
-                                                FBNet, OpacityNet, CovNet, ColorNet,
-                                                ImHeight, ImWidth, TanFovx, TanFovy, ViewMatrices, TrainedImages);
-    optimizer.TrainingSetup();
-    optimizer.Optimize();
+    // GaussianSplatting::RenderOptimizer optimizer(SizeofInitAnchors, AnchorFeatureDim, AnchorSizeofOffsets, CamNum, 
+    //                                             AnchorWorldPos, AnchorFeatures, AnchorScales, AnchorOffsets,
+    //                                             FBNet, OpacityNet, CovNet, ColorNet,
+    //                                             ImHeight, ImWidth, TanFovx, TanFovy, ViewMatrices, TrainedImages);
+    // optimizer.TrainingSetup();
+    // optimizer.Optimize();
 
     // 5. Postprocessing
 
